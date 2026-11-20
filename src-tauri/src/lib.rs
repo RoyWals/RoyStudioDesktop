@@ -104,6 +104,29 @@ fn write_project_file(root: String, rel: String, content: String) -> Result<(), 
 }
 
 #[tauri::command]
+fn write_project_file_base64(root: String, rel: String, content: String) -> Result<(), String> {
+    let full = safe_join(&root, &rel)?;
+    let clean = content.split(',').last().unwrap_or(&content).trim();
+    let bytes = base64::engine::general_purpose::STANDARD.decode(clean).map_err(|e| e.to_string())?;
+    if let Some(parent) = full.parent() { fs::create_dir_all(parent).map_err(|e| e.to_string())?; }
+    fs::write(full, bytes).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn read_external_file(file_path: String) -> Result<String, String> {
+    let bytes = fs::read(file_path).map_err(|e| e.to_string())?;
+    Ok(base64::engine::general_purpose::STANDARD.encode(bytes))
+}
+
+#[tauri::command]
+fn copy_external_file(root: String, file_path: String, rel: String) -> Result<(), String> {
+    let dest = safe_join(&root, &rel)?;
+    if let Some(parent) = dest.parent() { fs::create_dir_all(parent).map_err(|e| e.to_string())?; }
+    fs::copy(file_path, dest).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
 fn export_html_file(out_path: String, html: String) -> Result<(), String> {
     fs::write(out_path, html).map_err(|e| e.to_string())
 }
@@ -457,16 +480,12 @@ fn build_standalone_exe(
     })
 }
 
-#[tauri::command]
-fn open_in_explorer(path: String) -> Result<(), String> {
+    #[tauri::command]
+    fn open_in_explorer(path: String) -> Result<(), String> {
     let p = Path::new(&path);
-    let target = if p.is_file() {
-        p.parent().unwrap_or(p)
-    } else {
-        p
-    };
-    Command::new("explorer")
-        .arg(target)
+    let mut cmd = Command::new("explorer");
+    if p.is_file() { cmd.arg("/select,").arg(p); } else { cmd.arg(p); }
+    cmd
         .spawn()
         .map_err(|e| e.to_string())?;
     Ok(())
@@ -611,6 +630,14 @@ pub struct IdeUpdateInfo {
 #[tauri::command]
 fn get_app_version(app: AppHandle) -> String {
     app.package_info().version.to_string()
+}
+
+#[tauri::command]
+fn get_launch_file() -> Option<String> {
+    std::env::args().skip(1).find(|arg| {
+        matches!(Path::new(arg).extension().and_then(|e| e.to_str()).unwrap_or("").to_ascii_lowercase().as_str(), "roy" | "royson" | "royproj")
+            && Path::new(arg).is_file()
+    })
 }
 
 #[tauri::command]
@@ -991,11 +1018,14 @@ pub fn run() {
             app.handle().plugin(tauri_plugin_updater::Builder::new().build())?;
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![
+            .invoke_handler(tauri::generate_handler![
             scan_project,
             read_project_file,
             read_project_file_base64,
-            write_project_file,
+                write_project_file,
+                write_project_file_base64,
+                read_external_file,
+                copy_external_file,
             export_html_file,
             write_text_absolute,
             get_parent_dir,
@@ -1009,6 +1039,7 @@ pub fn run() {
             git_init,
             git_commit,
             get_app_version,
+            get_launch_file,
             fetch_roylang_releases,
             list_installed_engines,
             download_roylang_engine,

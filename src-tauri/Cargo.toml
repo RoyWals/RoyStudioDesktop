@@ -1,6 +1,6 @@
 [package]
 name = "roystudio-desktop"
-version = "1.0.0"
+version = "1.0.1"
 description = "RoyStudio Desktop IDE for RoyLang"
 edition = "2021"
 

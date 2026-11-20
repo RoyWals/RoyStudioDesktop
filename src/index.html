@@ -89,6 +89,8 @@
             </div>
           </div>
           <div id="fileTree" class="file-tree"></div>
+          <div class="side-section-head recent-head"><span>НЕДАВНИЕ</span><button id="btnRecentClear" title="Очистить историю">Очистить</button></div>
+          <div id="recentProjects" class="recent-list"></div>
           <div class="side-section-head outline-head">
             <span>СТРУКТУРА (OUTLINE)</span>
             <span class="badge-num" id="outlineCount">0</span>
@@ -152,8 +154,8 @@
         </div>
         <div id="editorHost" class="editor-host"></div>
         <div id="imageViewer" class="image-viewer hidden">
-          <div class="iv-meta" id="ivMeta"></div>
-          <div class="iv-stage"><img id="ivImg" alt="Preview" /></div>
+          <div class="iv-toolbar"><div class="iv-meta" id="ivMeta"></div><div class="iv-controls" id="ivControls"></div></div>
+          <div class="iv-stage" id="ivStage"><img id="ivImg" alt="Preview" /></div>
         </div>
 
         <div class="resizer-h" id="resizerBottom" title="Изменить высоту панели"></div>

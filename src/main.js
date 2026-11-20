@@ -7,7 +7,7 @@ import {
   compareSemver,
   sortSemverDesc
 } from './core/engine-manager.js';
-import { createFsBridge, isTauriEnv, isTextFile, isImageFile, getExt } from './fs-bridge.js';
+import { createFsBridge, isTauriEnv, isTextFile, isImageFile, isMediaFile, getExt } from './fs-bridge.js';
 import { createRoyEditor, detectMonacoLang, updateRoyLanguageMeta } from './editor/monaco-roy.js';
 
 const fsBridge = createFsBridge();
@@ -35,10 +35,134 @@ const state = {
   diagIdx: -1
 };
 
+const RECENT_KEY = 'roystudio.recent.v1';
+function readRecent() { try { return JSON.parse(localStorage.getItem(RECENT_KEY) || '[]'); } catch { return []; } }
+function saveRecent(items) { localStorage.setItem(RECENT_KEY, JSON.stringify(items.slice(0, 12))); renderRecent(); }
+function rememberRecent(proj, file = null) {
+  if (!proj?.rootPath) return;
+  const items = readRecent().filter(x => x.rootPath !== proj.rootPath || (file && x.file !== file));
+  items.unshift({ rootPath: proj.rootPath, name: proj.name, file: file || null, at: Date.now() });
+  saveRecent(items);
+}
+function renderRecent() {
+  const box = el('recentProjects'); if (!box) return;
+  const items = readRecent();
+  box.innerHTML = items.length ? items.map((x, i) => `<button class="recent-item" data-recent="${i}" title="${escapeHtml(x.rootPath)}"><span>◷</span><span><b>${escapeHtml(x.name || x.rootPath)}</b><small>${escapeHtml(x.file || x.rootPath)}</small></span></button>`).join('') : '<div class="muted pad-msg">Недавних проектов нет</div>';
+  box.querySelectorAll('.recent-item').forEach(b => b.addEventListener('click', async () => {
+    const x = readRecent()[Number(b.dataset.recent)];
+    try { const p = await fsBridge.openFolderPath(x.rootPath); if (p) { loadProjectState(p); if (x.file && state.textFiles[x.file]) openFile(x.file); } }
+    catch (err) { addLog(`Не удалось открыть недавний проект: ${err.message || err}`, 'err'); }
+  }));
+}
+
 const el = id => document.getElementById(id);
 let editor = null;
 let diagTimer = null;
 let autoSaveTimer = null;
+
+function installDropHandlers() {
+  const editorDrop = el('editorHost');
+  const treeDrop = el('fileTree');
+  const mark = (node, on) => node?.classList.toggle('drop-target', on);
+  const pathsFromDataTransfer = (dt) => [...(dt?.files || [])];
+  const prevent = (e) => { e.preventDefault(); e.stopPropagation(); };
+
+  if (editorDrop) {
+    editorDrop.addEventListener('dragover', e => { prevent(e); mark(editorDrop, true); });
+    editorDrop.addEventListener('dragleave', e => { if (!editorDrop.contains(e.relatedTarget)) mark(editorDrop, false); });
+    editorDrop.addEventListener('drop', async e => {
+      prevent(e); mark(editorDrop, false);
+      const targetFile = state.activeFile;
+      const files = pathsFromDataTransfer(e.dataTransfer);
+      for (const file of files) {
+        try {
+          const item = isTauriEnv() && file.path
+            ? await fsBridge.openExternalFile(file.path)
+            : await fsBridge.importDroppedFile(file);
+          const p = item.path;
+          state.allFiles = [...new Set([...state.allFiles, p])].sort();
+          if (item.text != null) state.textFiles[p] = item.text;
+          if (item.assetUrl) state.assetUrls[p] = item.assetUrl;
+          if (item.base64) state.assetBase64[p] = item.base64;
+          if (overEditor && isMediaFile(p) && targetFile && state.textFiles[targetFile] != null) {
+            openFile(targetFile);
+            editor?.insertText(JSON.stringify(p));
+          } else openFile(p);
+        } catch (err) { addLog(`Не удалось открыть файл: ${err.message || err}`, 'err'); }
+      }
+      renderTree();
+    });
+  }
+  if (treeDrop) {
+    treeDrop.addEventListener('dragover', e => { prevent(e); mark(treeDrop, true); });
+    treeDrop.addEventListener('dragleave', e => { if (!treeDrop.contains(e.relatedTarget)) mark(treeDrop, false); });
+    treeDrop.addEventListener('drop', async e => {
+      prevent(e); mark(treeDrop, false);
+      const files = pathsFromDataTransfer(e.dataTransfer);
+      const target = e.target.closest?.('.tree-folder')?.dataset.dir || '';
+      const treeRect = treeDrop.getBoundingClientRect();
+      const treePoint = e.clientX >= treeRect.left && e.clientX <= treeRect.right && e.clientY >= treeRect.top && e.clientY <= treeRect.bottom;
+      for (const file of files) {
+        try {
+          const item = treePoint
+            ? await fsBridge.importDroppedFile(file, target ? `${target}/${file.name}` : file.name)
+            : (isTauriEnv() && file.path ? await fsBridge.openExternalFile(file.path) : await fsBridge.importDroppedFile(file));
+          const p = item.path;
+          state.allFiles = [...new Set([...state.allFiles, p])].sort();
+          if (item.text != null) state.textFiles[p] = item.text;
+          if (item.assetUrl) state.assetUrls[p] = item.assetUrl;
+          if (item.base64) state.assetBase64[p] = item.base64;
+          openFile(p);
+          addLog(treePoint ? `Файл добавлен в проект: ${p}` : `Открыт файл: ${p}`, 'info');
+        } catch (err) { addLog(`Не удалось добавить файл: ${err.message || err}`, 'err'); }
+      }
+      renderTree();
+    });
+  }
+  // Tauri intercepts native Windows drops before Chromium exposes File.path.
+  // Consume its paths too, so dragging from Explorer works in the desktop build.
+  fsBridge.onTauriEvent('tauri://drag-drop', async payload => {
+    const paths = Array.isArray(payload?.paths) ? payload.paths : [];
+    const point = payload?.position;
+    const overEditor = point && editorDrop?.getBoundingClientRect && (() => {
+      const r = editorDrop.getBoundingClientRect();
+      return point.x >= r.left && point.x <= r.right && point.y >= r.top && point.y <= r.bottom;
+    })();
+    const targetFile = state.activeFile;
+    const overTree = point && treeDrop?.getBoundingClientRect && (() => {
+      const r = treeDrop.getBoundingClientRect();
+      return point.x >= r.left && point.x <= r.right && point.y >= r.top && point.y <= r.bottom;
+    })();
+    for (const filePath of paths) {
+      try {
+        if (overTree) {
+          const item = await fsBridge.openExternalFile(filePath);
+          const p = item.path;
+          if (state.rootPath) await fsBridge.copyExternalFile(filePath, p);
+          else throw new Error('Сначала открой папку проекта, чтобы добавить в неё файл');
+          state.allFiles = [...new Set([...state.allFiles, p])].sort();
+          if (item.text != null) state.textFiles[p] = item.text;
+          if (item.assetUrl) state.assetUrls[p] = item.assetUrl;
+          if (isMediaFile(p)) {
+            state.assetBase64[p] = item.base64;
+            openFile(p);
+          } else openFile(p);
+        } else {
+          const item = await fsBridge.openExternalFile(filePath);
+          const p = item.path;
+          state.allFiles = [...new Set([...state.allFiles, p])].sort();
+          if (item.text != null) state.textFiles[p] = item.text;
+          if (item.assetUrl) state.assetUrls[p] = item.assetUrl;
+          if (isMediaFile(p) && targetFile && state.textFiles[targetFile] != null) {
+            openFile(targetFile);
+            editor?.insertText(JSON.stringify(p));
+          } else openFile(p);
+        }
+      } catch (err) { addLog(`Не удалось обработать перетащенный файл: ${err.message || err}`, 'err'); }
+    }
+    renderTree();
+  });
+}
 
 function escapeHtml(s) {
   return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -279,7 +403,7 @@ function renderTree() {
   tree.querySelectorAll('.tree-item[data-path]').forEach(node => {
     node.addEventListener('click', () => {
       const p = node.dataset.path;
-      if (isTextFile(p) || isImageFile(p)) openFile(p);
+      if (isTextFile(p) || isImageFile(p) || isMediaFile(p)) openFile(p);
     });
     node.addEventListener('contextmenu', (e) => {
       e.preventDefault();
@@ -334,19 +458,36 @@ function showImageTab(path) {
   const url = state.assetUrls[path];
   el('editorHost').classList.add('hidden');
   el('imageViewer').classList.remove('hidden');
+  el('ivStage').innerHTML = '<img id="ivImg" alt="Preview" />';
   const img = el('ivImg');
   img.onload = () => {
     el('ivMeta').textContent = `${path} · ${img.naturalWidth} × ${img.naturalHeight} px`;
   };
   img.src = url || '';
   el('ivMeta').textContent = path;
+  el('ivControls').innerHTML = '<button id="ivZoomOut">−</button><span id="ivZoomValue">100%</span><button id="ivZoomIn">+</button><button id="ivZoomReset">Сбросить</button>';
+  let zoom = 1;
+  const applyZoom = () => { img.style.transform = `scale(${zoom})`; el('ivZoomValue').textContent = `${Math.round(zoom * 100)}%`; };
+  el('ivZoomOut').onclick = () => { zoom = Math.max(.2, zoom - .1); applyZoom(); };
+  el('ivZoomIn').onclick = () => { zoom = Math.min(5, zoom + .1); applyZoom(); };
+  el('ivZoomReset').onclick = () => { zoom = 1; applyZoom(); };
   document.querySelector('.sb-lang').textContent = 'Изображение';
+}
+
+function showAudioTab(path) {
+  el('editorHost').classList.add('hidden'); el('imageViewer').classList.remove('hidden');
+  const url = state.assetUrls[path];
+  el('ivMeta').textContent = path;
+  el('ivControls').innerHTML = '';
+  el('ivStage').innerHTML = `<div class="audio-preview"><div class="audio-icon">♫</div><audio controls src="${escapeHtml(url || '')}"></audio></div>`;
+  document.querySelector('.sb-lang').textContent = 'Аудио';
 }
 
 function openFile(path, line = null, fromHistory = false) {
   const hasText = state.textFiles[path] != null;
   const isImg = isImageFile(path) && state.assetUrls[path] != null;
-  if (!hasText && !isImg) return;
+  const isAudio = ['mp3', 'ogg', 'wav'].includes(getExt(path)) && state.assetUrls[path] != null;
+  if (!hasText && !isImg && !isAudio) return;
   if (!state.openTabs.includes(path)) state.openTabs.push(path);
   if (!fromHistory) {
     if (state.tabHistory[state.tabHistoryIdx] !== path) {
@@ -357,9 +498,12 @@ function openFile(path, line = null, fromHistory = false) {
     }
   }
   state.activeFile = path;
+  rememberRecent({ rootPath: state.rootPath, name: state.projectName }, path);
 
   if (isImg && !hasText) {
     showImageTab(path);
+  } else if (isAudio && !hasText) {
+    showAudioTab(path);
   } else {
     el('imageViewer').classList.add('hidden');
     el('editorHost').classList.remove('hidden');
@@ -489,6 +633,8 @@ function renderProblems() {
   pane.querySelectorAll('.diag-row').forEach(row => {
     row.addEventListener('click', () => {
       const d = state.diagnostics[Number(row.dataset.idx)];
+      toggleBottomPanel(true);
+      document.querySelector('.btab[data-tab="problems"]')?.click();
       if (d.file && state.textFiles[d.file] != null) openFile(d.file, d.line || 1);
       else if (editor && d.line) editor.revealLine(d.line);
     });
@@ -1055,7 +1201,7 @@ async function runBuildPipeline() {
         outPath = `${slug}.html`;
       }
       const written = await fsBridge.writeTextAbsolute(outPath, built.html);
-      lastBuildDirPath = isTauriEnv() ? outPath : null;
+      lastBuildDirPath = isTauriEnv() ? (outPath.split(/[\\/]/).slice(0, -1).join('/') || outPath) : null;
       el('btnOpenBuildDir').disabled = !lastBuildDirPath;
       el('buildResultInfo').textContent = `${slug}.html · ${formatBytesSize(written || built.html.length)}`;
       setBuildLog(`Готово!\nФайл: ${outPath}\nРазмер: ${formatBytesSize(written || built.html.length)}`);
@@ -1095,7 +1241,7 @@ async function runBuildPipeline() {
         }
       }
       const bytes = await fsBridge.exportZipArchive(outZip, entries);
-      lastBuildDirPath = outZip;
+       lastBuildDirPath = outZip.split(/[\\/]/).slice(0, -1).join('/');
       el('btnOpenBuildDir').disabled = false;
       el('buildResultInfo').textContent = `${slug}.zip · ${formatBytesSize(bytes)} (${entries.length} файл.)`;
       setBuildLog(`ZIP (Игра) собран!\nАрхив: ${outZip}\nФайлов: ${entries.length} · Размер: ${formatBytesSize(bytes)}`);
@@ -1119,7 +1265,7 @@ async function runBuildPipeline() {
         entries.push({ path: rel, is_base64: true, data: b64 });
       }
       const bytes = await fsBridge.exportZipArchive(outZip, entries);
-      lastBuildDirPath = outZip;
+       lastBuildDirPath = outZip.split(/[\\/]/).slice(0, -1).join('/');
       el('btnOpenBuildDir').disabled = false;
       el('buildResultInfo').textContent = `${slug}-source.zip · ${formatBytesSize(bytes)} (${entries.length} файл.)`;
       setBuildLog(`ZIP исходников собран!\nАрхив: ${outZip}\nФайлов: ${entries.length} · Размер: ${formatBytesSize(bytes)}`);
@@ -1132,7 +1278,7 @@ async function runBuildPipeline() {
       const built = buildCompiledOutput(false, { embedDataUrls: true, entryOverride: entry, titleOverride: name });
       const cfgJson = JSON.stringify({ title: name, width, height, bg, fullscreen, resizable });
       const res = await fsBridge.buildStandaloneExe(state.rootPath, dir, slug, cfgJson, built.html, iconPath);
-      lastBuildDirPath = res.exe_path;
+       lastBuildDirPath = dir;
       el('btnOpenBuildDir').disabled = false;
       el('buildResultInfo').textContent = `${slug}.exe · ${formatBytesSize(res.size_bytes)}`;
       setBuildLog(
@@ -1164,6 +1310,8 @@ function loadProjectState(proj) {
   state.diagIdx = -1;
   state.activeFile = null;
   state.projectName = proj.name;
+  rememberRecent(proj);
+  renderRecent();
   const mf = findManifestFile();
   if (mf) {
     const manifest = getProjectManifest();
@@ -1560,8 +1708,13 @@ function renderCmdList(q) {
   const fileItems = Object.keys(state.textFiles).concat(Object.keys(state.assetUrls).filter(k => state.textFiles[k] == null)).map(f => ({
     label: `Файл: ${f}`, hint: 'открыть', run: () => openFile(f)
   }));
-  const source = cmdPaletteMode === 'files' ? [...fileItems, ...COMMANDS] : [...COMMANDS, ...fileItems];
-  const all = source.filter(c => !s || c.label.toLowerCase().includes(s));
+  const source = cmdPaletteMode === 'files' ? fileItems : [...COMMANDS, ...fileItems];
+  const fuzzy = (text, query) => {
+    let score = 0, pos = 0;
+    for (const ch of query) { const at = text.indexOf(ch, pos); if (at < 0) return -1; score += at === pos ? 3 : 1; pos = at + 1; }
+    return score - (text.length - query.length) * .01;
+  };
+  const all = source.map((c, idx) => ({ c, idx, score: !s ? 0 : fuzzy(c.label.toLowerCase(), s) })).filter(x => x.score >= 0).sort((a, b) => b.score - a.score).map(x => x.c);
   el('cmdList').innerHTML = all.slice(0, 25).map((c, i) =>
     `<div class="cmd-item ${i === 0 ? 'sel' : ''}" data-i="${i}"><span>${escapeHtml(c.label)}</span><span>${escapeHtml(c.hint)}</span></div>`
   ).join('');
@@ -1818,6 +1971,7 @@ el('btnRun').addEventListener('click', compileAndRun);
 el('btnReloadPreview').addEventListener('click', compileAndRun);
 el('btnFullscreenPreview').addEventListener('click', togglePreviewFullscreen);
 el('btnBuildModal').addEventListener('click', () => openBuildModal());
+el('btnRecentClear')?.addEventListener('click', () => { localStorage.removeItem(RECENT_KEY); renderRecent(); });
 
 el('btnCloseBuild').addEventListener('click', closeBuildModal);
 el('buildModal').addEventListener('click', (e) => { if (e.target === el('buildModal')) closeBuildModal(); });
@@ -2321,8 +2475,27 @@ async function boot() {
     onCursor: (ln, col) => { el('sbCursor').textContent = `Стр ${ln}, Стб ${col}`; },
     onCmdPalette: () => openCmdPalette('all')
   });
-  const demo = await fsBridge.openDemo();
-  loadProjectState(demo);
+
+  installDropHandlers();
+  const launchFile = await fsBridge.getLaunchFile().catch(() => null);
+  if (launchFile) {
+    try {
+      const ext = getExt(launchFile);
+      const projectRoot = await fsBridge.getParentDir(launchFile);
+      const proj = await fsBridge.openFolderPath(projectRoot);
+      if (proj) {
+        loadProjectState(proj);
+        const rel = launchFile.slice(projectRoot.length).replace(/^[\\/]+/, '').replace(/\\/g, '/');
+        if (state.textFiles[rel] != null || state.assetUrls[rel] != null) openFile(rel);
+        else addLog(`Файл выбран в Проводнике, но не загружен: .${ext}`, 'warn');
+      }
+    } catch (err) {
+      addLog(`Не удалось открыть файл из Проводника: ${err.message || err}`, 'err');
+      loadProjectState(await fsBridge.openDemo());
+    }
+  } else {
+    loadProjectState(await fsBridge.openDemo());
+  }
   setTimeout(() => refreshAllUpdates(true), 3000);
 }
 

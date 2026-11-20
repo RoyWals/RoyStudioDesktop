@@ -199,6 +199,24 @@ export function createFsBridge() {
       return loadCurrentFolder();
     },
 
+    async openFolderPath(path) {
+      if (!isTauriEnv() || !path) return null;
+      mode = 'tauri';
+      rootPath = path;
+      dirHandle = null;
+      return loadCurrentFolder();
+    },
+
+    async getLaunchFile() {
+      if (!isTauriEnv()) return null;
+      return tauriInvoke('get_launch_file');
+    },
+
+    async getParentDir(filePath) {
+      if (!isTauriEnv()) return null;
+      return tauriInvoke('get_parent_dir', { filePath });
+    },
+
     async createDir(rel) {
       if (mode === 'demo') return;
       if (mode === 'tauri') {
@@ -285,6 +303,52 @@ export function createFsBridge() {
         await writable.write(content);
         await writable.close();
       }
+    },
+
+    async importDroppedFile(file, relPath = null) {
+      if (!file) throw new Error('Файл не выбран');
+      const rel = String(relPath || file.name).replace(/\\/g, '/').split('/').filter(p => p && p !== '.' && p !== '..').join('/');
+      if (!rel) throw new Error('Не удалось определить имя файла');
+      const ext = getExt(rel);
+      const bytes = new Uint8Array(await file.arrayBuffer());
+      if (mode === 'tauri' && rootPath) {
+        const data = btoa(Array.from(bytes, b => String.fromCharCode(b)).join(''));
+        await tauriInvoke('write_project_file_base64', { root: rootPath, rel, content: data });
+      } else if (mode === 'web-fs' && dirHandle) {
+        const parts = rel.split('/');
+        let parent = dirHandle;
+        for (const part of parts.slice(0, -1)) parent = await parent.getDirectoryHandle(part, { create: true });
+        const handle = await parent.getFileHandle(parts[parts.length - 1], { create: true });
+        const writable = await handle.createWritable();
+        await writable.write(file);
+        await writable.close();
+        webHandles.set(rel, handle);
+      } else if (mode === 'demo') {
+        if (!isTextFile(rel)) throw new Error('В демо-проекте можно открыть только текстовые файлы');
+        memoryFiles[rel] = await file.text();
+      } else {
+        throw new Error('Сначала открой папку проекта, чтобы добавить в неё файл');
+      }
+      if (!isTextFile(rel) && !isImageFile(rel)) throw new Error(`Формат .${ext || '?'} нельзя открыть в редакторе`);
+      if (isTextFile(rel)) return { path: rel, text: await file.text(), assetUrl: null, base64: null };
+      if (MEDIA_MIME[ext]) return { path: rel, text: null, assetUrl: URL.createObjectURL(file), base64: arrayBufferToBase64(bytes) };
+      return { path: rel, text: null, assetUrl: null, base64: null };
+    },
+
+    async openExternalFile(filePath) {
+      if (!isTauriEnv()) throw new Error('Перетаскивание файлов из системы поддерживается в настольном приложении');
+      const data = await tauriInvoke('read_external_file', { filePath });
+      const name = filePath.split(/[\\/]/).pop();
+      const ext = getExt(name);
+      if (isTextFile(name)) return { path: name, text: new TextDecoder().decode(Uint8Array.from(atob(data), c => c.charCodeAt(0))) };
+      if (MEDIA_MIME[ext]) return { path: name, text: null, assetUrl: `data:${MEDIA_MIME[ext]};base64,${data}`, base64: data };
+      throw new Error(`Формат .${ext || '?'} нельзя открыть в редакторе`);
+    },
+
+    async copyExternalFile(filePath, relPath) {
+      if (!isTauriEnv() || mode !== 'tauri' || !rootPath) throw new Error('Сначала открой папку проекта');
+      await tauriInvoke('copy_external_file', { root: rootPath, filePath, rel: relPath });
+      return this.openExternalFile(filePath);
     },
 
     async exportHtml(defaultName, html) {
@@ -396,6 +460,7 @@ export function createFsBridge() {
 
     async openInExplorer(path) {
       if (isTauriEnv() && path) {
+        if (typeof path !== 'string') throw new Error('Некорректный путь сборки');
         await tauriInvoke('open_in_explorer', { path });
       }
     },
