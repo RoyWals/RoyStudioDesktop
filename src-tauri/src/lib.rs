@@ -962,6 +962,11 @@ async fn check_ide_update(app: AppHandle) -> Result<IdeUpdateInfo, String> {
 
 #[tauri::command]
 async fn install_ide_update(app: AppHandle) -> Result<(), String> {
+    use std::sync::{
+        atomic::{AtomicU64, Ordering},
+        Arc,
+    };
+
     let updater = app.updater().map_err(|e| e.to_string())?;
     let update = updater
         .check()
@@ -969,28 +974,33 @@ async fn install_ide_update(app: AppHandle) -> Result<(), String> {
         .map_err(|e| e.to_string())?
         .ok_or_else(|| "Новых версий RoyStudio Desktop не найдено.".to_string())?;
 
-    let mut downloaded: u64 = 0;
+    let downloaded = Arc::new(AtomicU64::new(0));
+    let dl_chunk = Arc::clone(&downloaded);
+    let dl_done = Arc::clone(&downloaded);
     let app_prog = app.clone();
     let app_done = app.clone();
-    update
-        .download_and_install(
+
+    let bytes = update
+        .download(
             move |chunk_len, content_len| {
-                downloaded += chunk_len as u64;
+                let total_dl =
+                    dl_chunk.fetch_add(chunk_len as u64, Ordering::Relaxed) + chunk_len as u64;
                 let _ = app_prog.emit(
                     "ide-update-progress",
                     IdeProgressEvent {
-                        downloaded,
+                        downloaded: total_dl,
                         total: content_len,
                         finished: false,
                     },
                 );
             },
             move || {
+                let total_dl = dl_done.load(Ordering::Relaxed);
                 let _ = app_done.emit(
                     "ide-update-progress",
                     IdeProgressEvent {
-                        downloaded,
-                        total: Some(downloaded),
+                        downloaded: total_dl,
+                        total: Some(total_dl),
                         finished: true,
                     },
                 );
@@ -999,7 +1009,23 @@ async fn install_ide_update(app: AppHandle) -> Result<(), String> {
         .await
         .map_err(|e| e.to_string())?;
 
-    app.restart();
+    // Даём интерфейсу 350 мс, чтобы полоска честно доехала до 100%
+    std::thread::sleep(Duration::from_millis(350));
+
+    update.install(bytes).map_err(|e| e.to_string())?;
+
+    // На Windows NSIS сам заменяет файлы и запускает новую версию.
+    // app.restart() здесь вызывать НЕЛЬЗЯ — иначе старый .exe заблокирует установку!
+    #[cfg(target_os = "windows")]
+    {
+        app.exit(0);
+        return Ok(());
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        app.restart();
+    }
 }
 
 #[tauri::command]
