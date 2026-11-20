@@ -1,0 +1,341 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RoyStudio Desktop — RoyLang IDE</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div id="app">
+    <!-- Top Title / Menu Bar (VS Code style) -->
+    <header class="titlebar">
+      <div class="tb-left">
+        <img src="app-icon.png" class="app-icon-img" alt="RoyStudio" />
+        <nav class="menubar" id="menubar">
+          <button class="menu-btn" data-menu="file">Файл</button>
+          <button class="menu-btn" data-menu="edit">Правка</button>
+          <button class="menu-btn" data-menu="selection">Выделение</button>
+          <button class="menu-btn" data-menu="view">Вид</button>
+          <button class="menu-btn" data-menu="go">Переход</button>
+          <button class="menu-btn" data-menu="run">Запуск</button>
+          <button class="menu-btn" data-menu="help">Справка</button>
+        </nav>
+      </div>
+      <div class="tb-center">
+        <button id="btnNavBack" class="nav-arrow" title="Назад по вкладкам (Alt+←)">←</button>
+        <button id="btnNavForward" class="nav-arrow" title="Вперёд по вкладкам (Alt+→)">→</button>
+        <button id="btnCmdPalette" class="cmd-trigger" title="Быстрые команды и файлы (Ctrl+Shift+P)">
+          <span>🔍</span>
+          <span id="projName">Демо-проект</span>
+          <kbd>Ctrl+Shift+P</kbd>
+        </button>
+      </div>
+      <div class="tb-actions">
+        <button class="ver-badge" id="engineVer" title="Версия движка RoyLang — нажмите для обновления или переключения">v6.5</button>
+        <button id="btnRun" class="primary compact-btn" title="Собрать и запустить игру (F5)">▶ F5</button>
+        <button id="btnBuildModal" class="compact-btn" title="Сборка и экспорт: HTML / ZIP / EXE (Ctrl+Shift+B)">📦 Сборка</button>
+        <button id="btnToggleSidebar" class="icon-btn active" title="Боковая панель (Ctrl+B)">
+          <svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.3"><rect x="1.5" y="2" width="13" height="12" rx="1.5"/><line x1="5.5" y1="2" x2="5.5" y2="14"/></svg>
+        </button>
+        <button id="btnToggleBottom" class="icon-btn active" title="Нижняя панель (Ctrl+`)">
+          <svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.3"><rect x="1.5" y="2" width="13" height="12" rx="1.5"/><line x1="1.5" y1="10" x2="14.5" y2="10"/></svg>
+        </button>
+        <button id="btnTogglePreview" class="icon-btn active" title="Превью игры">
+          <svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.3"><rect x="1.5" y="2" width="13" height="12" rx="1.5"/><line x1="10.5" y1="2" x2="10.5" y2="14"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Workbench -->
+    <div class="workbench" id="workbench">
+      <!-- Activity Bar -->
+      <nav class="activity-bar" aria-label="Панель активностей">
+        <button class="act-btn active" data-view="explorer" title="Проводник (Ctrl+Shift+E)">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/></svg>
+        </button>
+        <button class="act-btn" data-view="search" title="Поиск по проекту (Ctrl+Shift+F)">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        </button>
+        <button class="act-btn" data-view="git" title="Source Control / Git (Ctrl+Shift+G)">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="6" r="2.5"/><circle cx="6" cy="18" r="2.5"/><path d="M6 8.5v7"/><path d="M18 8.5c0 4.5-12 3-12 7"/></svg>
+        </button>
+        <button class="act-btn" data-view="run" title="Run &amp; Debug (F5)">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.7"><polygon points="6,4 20,12 6,20"/></svg>
+        </button>
+        <button class="act-btn" data-view="apis" title="Справочник RoyLang API">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+        </button>
+      </nav>
+
+      <!-- Side Panel -->
+      <aside class="sidebar" id="sidebar">
+        <!-- Explorer View -->
+        <div class="side-view" id="view-explorer">
+          <div class="side-head">
+            <span>ПРОВОДНИК</span>
+            <div class="side-head-btns">
+              <button id="btnSideNew" title="Новый .roy">+</button>
+              <button id="btnSideOpen" title="Открыть папку">📂</button>
+            </div>
+          </div>
+          <div class="side-section-head">
+            <span id="sideProjTitle">ПРОЕКТ</span>
+            <div class="side-head-btns">
+              <button id="btnTreeNewFile" title="Новый файл (inline)">📄+</button>
+              <button id="btnTreeNewDir" title="Новая папка (inline)">📁+</button>
+              <button id="btnTreeRefresh" title="Обновить с диска">↻</button>
+              <button id="btnTreeCollapse" title="Свернуть все папки">⊟</button>
+            </div>
+          </div>
+          <div id="fileTree" class="file-tree"></div>
+          <div class="side-section-head outline-head">
+            <span>СТРУКТУРА (OUTLINE)</span>
+            <span class="badge-num" id="outlineCount">0</span>
+          </div>
+          <div id="outlineList" class="outline-list"></div>
+        </div>
+
+        <!-- Search View -->
+        <div class="side-view hidden" id="view-search">
+          <div class="side-head"><span>ПОИСК ПО ФАЙЛАМ</span></div>
+          <div class="side-input-wrap">
+            <input id="searchFilesInput" type="search" placeholder="Найти в .roy файлах..." />
+          </div>
+          <div id="searchResults" class="search-results">
+            <div class="muted pad-msg">Введите текст для поиска по всем .roy файлам проекта.</div>
+          </div>
+        </div>
+
+        <!-- Git / Source Control View -->
+        <div class="side-view hidden" id="view-git">
+          <div class="side-head">
+            <span>SOURCE CONTROL</span>
+            <div class="side-head-btns"><button id="btnGitRefresh" title="Обновить Git">↻</button></div>
+          </div>
+          <div id="gitPane" class="git-pane"></div>
+        </div>
+
+        <!-- Run & Debug View -->
+        <div class="side-view hidden" id="view-run">
+          <div class="side-head"><span>RUN AND DEBUG</span></div>
+          <div class="run-pane">
+            <button id="btnRunPanelStart" class="primary full-btn">▶ Run and Debug (F5)</button>
+            <button id="btnRunPanelFullscreen" class="full-btn">⛶ Превью на весь экран (F11)</button>
+            <button id="btnRunPanelExport" class="full-btn">📦 Сборка проекта (HTML / ZIP / EXE)</button>
+            <div class="muted pad-msg" id="runEntryInfo">Входной файл: main.roy</div>
+          </div>
+        </div>
+
+        <!-- API Reference View -->
+        <div class="side-view hidden" id="view-apis">
+          <div class="side-head">
+            <span>API СПРАВОЧНИК</span>
+            <span class="badge-num" id="apiTotalCount">504</span>
+          </div>
+          <div class="side-input-wrap">
+            <input id="searchApiInput" type="search" placeholder="Фильтр API (drawCircle, mesh3D...)" />
+          </div>
+          <div id="apiList" class="api-list"></div>
+        </div>
+      </aside>
+
+      <div class="resizer-v" id="resizerLeft" title="Изменить ширину панели"></div>
+
+      <!-- Center Editor + Bottom Panel -->
+      <section class="editor-area">
+        <div class="tabs-bar" id="tabsBar"></div>
+        <div class="breadcrumbs" id="breadcrumbs">
+          <span class="bc-proj">RoyStudio</span>
+          <span class="bc-sep">›</span>
+          <span class="bc-file" id="bcFile">main.roy</span>
+        </div>
+        <div id="editorHost" class="editor-host"></div>
+        <div id="imageViewer" class="image-viewer hidden">
+          <div class="iv-meta" id="ivMeta"></div>
+          <div class="iv-stage"><img id="ivImg" alt="Preview" /></div>
+        </div>
+
+        <div class="resizer-h" id="resizerBottom" title="Изменить высоту панели"></div>
+
+        <div class="bottom-panel" id="bottomPanel">
+          <div class="bottom-tabs">
+            <button class="btab active" data-tab="problems">ПРОБЛЕМЫ <span id="probCount" class="count">0</span></button>
+            <button class="btab" data-tab="console">КОНСОЛЬ ИГРЫ <span id="logCount" class="count">0</span></button>
+            <button id="btnClearLog" class="clear-btn">Очистить</button>
+          </div>
+          <div id="problemsPane" class="bottom-body"></div>
+          <div id="consolePane" class="bottom-body hidden"></div>
+        </div>
+      </section>
+
+      <div class="resizer-v" id="resizerRight" title="Изменить ширину превью"></div>
+
+      <!-- Right Preview -->
+      <section class="preview-col" id="previewCol">
+        <div class="side-head">
+          <span class="preview-title">ПРЕВЬЮ ИГРЫ</span>
+          <div class="side-head-btns">
+            <span class="live-badge">LIVE</span>
+            <button id="btnReloadPreview" title="Перезапустить (F5)">↻</button>
+            <button id="btnFullscreenPreview" title="Полный экран превью (F11 / Esc)">⛶</button>
+          </div>
+        </div>
+        <iframe id="previewFrame" sandbox="allow-scripts allow-same-origin allow-pointer-lock" allowfullscreen></iframe>
+      </section>
+    </div>
+
+    <!-- VS Code Status Bar -->
+    <footer class="statusbar">
+      <div class="sb-left">
+        <span class="sb-remote" id="envBadge">◆ RoyStudio</span>
+        <button class="sb-item" id="sbProblems" title="Показать проблемы">
+          <span id="sbErrIcon">✖ 0</span>
+          <span id="sbWarnIcon">⚠ 0</span>
+        </button>
+        <span class="sb-item" id="buildStatus">Готово</span>
+      </div>
+      <div class="sb-right">
+        <span class="sb-item" id="sbCursor">Стр 1, Стб 1</span>
+        <span class="sb-item">Отступ: 2</span>
+        <span class="sb-item">UTF-8</span>
+        <span class="sb-item sb-lang">RoyLang v6.5</span>
+        <button class="sb-item sb-update" id="sbUpdateBtn" title="Центр обновлений: IDE и движок RoyLang">⟳ Обновления</button>
+      </div>
+    </footer>
+  </div>
+
+  <!-- Top Menu Dropdown -->
+  <div id="menuDropdown" class="menu-dropdown hidden"></div>
+
+  <!-- Two-Level Updater Modal (IDE + RoyLang Engine) -->
+  <div id="updateModal" class="cmd-modal hidden">
+    <div class="update-box">
+      <div class="info-head">
+        <span>🔄 Центр обновлений — RoyStudio &amp; RoyLang</span>
+        <div class="upd-head-actions">
+          <button id="btnCheckUpdatesNow">↻ Проверить сейчас</button>
+          <button id="btnCloseUpdate" class="info-close">✕</button>
+        </div>
+      </div>
+      <div class="upd-body">
+        <!-- Level 1: IDE -->
+        <section class="upd-card">
+          <div class="upd-card-head">
+            <div>
+              <strong>Уровень 1 · RoyStudio Desktop (IDE)</strong>
+              <span class="upd-cur" id="updIdeCur">v1.0.0</span>
+            </div>
+            <button id="btnIdeUpdate" class="primary" disabled>Проверить</button>
+          </div>
+          <div class="upd-status" id="updIdeStatus">Нажмите «Проверить сейчас» или дождитесь фоновой проверки.</div>
+          <div class="upd-prog hidden" id="updIdeProgWrap">
+            <div class="upd-prog-bar"><div class="upd-prog-fill" id="updIdeProgFill"></div></div>
+            <span class="upd-prog-text" id="updIdeProgText">0%</span>
+          </div>
+          <pre class="upd-notes hidden" id="updIdeNotes"></pre>
+        </section>
+
+        <!-- Level 2: RoyLang Engine -->
+        <section class="upd-card">
+          <div class="upd-card-head">
+            <div>
+              <strong>Уровень 2 · Движок RoyLang</strong>
+              <span class="upd-cur" id="updEngActive">v6.5 (встроенный)</span>
+            </div>
+            <button id="btnEngResetBuiltin" title="Вернуться к встроенному в IDE движку">↺ Встроенная</button>
+          </div>
+          <div class="upd-prog hidden" id="updEngProgWrap">
+            <div class="upd-prog-bar"><div class="upd-prog-fill" id="updEngProgFill"></div></div>
+            <span class="upd-prog-text" id="updEngProgText">Загрузка...</span>
+          </div>
+          <div class="upd-eng-split">
+            <div class="upd-eng-list" id="updEngList">
+              <div class="muted">Загрузка списка версий из RoyWals/RoyLang...</div>
+            </div>
+            <div class="upd-notes-pane">
+              <div class="upd-notes-title" id="updEngNotesTitle">Changelog (GitHub Releases)</div>
+              <pre class="upd-notes" id="updEngNotes">Выберите версию из списка слева, чтобы посмотреть список изменений.</pre>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <!-- Build / Export Modal (HTML / ZIP / EXE) -->
+  <div id="buildModal" class="cmd-modal hidden">
+    <div class="build-box">
+      <div class="info-head">
+        <span>📦 Сборка и экспорт проекта</span>
+        <button id="btnCloseBuild" class="info-close">✕</button>
+      </div>
+      <div class="build-body">
+        <div class="build-targets" id="buildTargets">
+          <button class="bld-tab active" data-target="html">🌐 HTML</button>
+          <button class="bld-tab" data-target="zip">🗜 ZIP (Игра)</button>
+          <button class="bld-tab" data-target="zip-src">📁 ZIP (Исходники)</button>
+          <button class="bld-tab" data-target="exe">🪟 EXE (Windows)</button>
+        </div>
+        <div class="build-grid">
+          <label>Название<input id="bldName" type="text" placeholder="My Game" /></label>
+          <label>Версия<input id="bldVersion" type="text" placeholder="1.0.0" /></label>
+          <label>Автор<input id="bldAuthor" type="text" placeholder="Author" /></label>
+          <label>Входной файл<input id="bldEntry" type="text" placeholder="main.roy" /></label>
+          <label>Ширина (px)<input id="bldWidth" type="number" min="200" max="3840" /></label>
+          <label>Высота (px)<input id="bldHeight" type="number" min="200" max="2160" /></label>
+          <label>Фон окна<input id="bldBg" type="text" placeholder="#0b0f1a" /></label>
+          <label>Папка вывода<div class="build-row"><input id="bldOutDir" type="text" placeholder="dist" /><button id="btnPickOutDir" title="Выбрать папку">📂</button></div></label>
+        </div>
+        <div class="build-icon-row">
+          <label>Иконка .ico (для .exe)<div class="build-row"><input id="bldIcon" type="text" placeholder="assets/icon.ico (необязательно)" /><button id="btnPickBuildIcon" title="Выбрать .ico файл">🖼</button></div></label>
+        </div>
+        <div class="build-checks">
+          <label class="chk"><input id="bldSingleFile" type="checkbox" checked /> Один файл (вшить ассеты)</label>
+          <label class="chk"><input id="bldIncludeSrc" type="checkbox" /> Включить исходники в ZIP</label>
+          <label class="chk"><input id="bldFullscreen" type="checkbox" /> Fullscreen</label>
+          <label class="chk"><input id="bldResizable" type="checkbox" checked /> Resizable окно</label>
+          <label class="chk"><input id="bldSaveManifest" type="checkbox" checked /> Сохранить в game.royproj</label>
+        </div>
+        <div class="build-log" id="buildLog">Готово к сборке. Выберите цель и нажмите «Собрать».</div>
+      </div>
+      <div class="build-footer">
+        <span class="muted" id="buildResultInfo">—</span>
+        <div class="build-footer-btns">
+          <button id="btnOpenBuildDir" disabled>📂 Открыть папку с билдом</button>
+          <button id="btnStartBuild" class="primary">🔨 Собрать</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Info / Shortcuts Modal -->
+  <div id="infoModal" class="cmd-modal hidden">
+    <div class="info-box">
+      <div class="info-head">
+        <span id="infoTitle"></span>
+        <button id="btnCloseInfo" class="info-close">✕</button>
+      </div>
+      <div id="infoBody" class="info-body"></div>
+    </div>
+  </div>
+
+  <!-- Context Menu -->
+  <div id="ctxMenu" class="ctx-menu hidden">
+    <button data-act="new-file">📄 Новый файл</button>
+    <button data-act="new-dir">📁 Новая папка</button>
+    <button data-act="rename">✏ Переименовать</button>
+    <button data-act="delete" class="danger">🗑 Удалить</button>
+  </div>
+
+  <!-- Command Palette Modal -->
+  <div id="cmdModal" class="cmd-modal hidden">
+    <div class="cmd-box">
+      <input id="cmdInput" type="text" placeholder="Введите команду или имя файла..." />
+      <div id="cmdList" class="cmd-list"></div>
+    </div>
+  </div>
+
+  <script type="module" src="main.js"></script>
+</body>
+</html>

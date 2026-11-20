@@ -1,0 +1,54 @@
+name: Release RoyStudio Desktop
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+jobs:
+  publish-tauri:
+    permissions:
+      contents: write
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+
+      - name: Build roy-runner stub
+        shell: pwsh
+        run: |
+          cargo build --release --manifest-path src-tauri/Cargo.toml --bin roy-runner
+          New-Item -ItemType Directory -Force -Path src-tauri/resources/runners | Out-Null
+          New-Item -ItemType Directory -Force -Path resources/runners | Out-Null
+          Copy-Item -Force src-tauri/target/release/roy-runner.exe src-tauri/resources/runners/roy-runner-win-x64.exe
+          Copy-Item -Force src-tauri/target/release/roy-runner.exe resources/runners/roy-runner-win-x64.exe
+
+      - name: Install npm dependencies
+        run: npm install
+
+      - name: Build and Release RoyStudio Desktop
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: "RoyStudio Desktop ${{ github.ref_name }}"
+          releaseBody: "Установщик Windows (Setup.exe) и артефакты автообновления RoyStudio Desktop."
+          releaseDraft: false
+          prerelease: false
+          uploadUpdaterJson: true

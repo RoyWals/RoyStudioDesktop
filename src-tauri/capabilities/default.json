@@ -1,0 +1,15 @@
+{
+  "$schema": "https://schemas.tauri.app/config/2/capability",
+  "identifier": "default",
+  "description": "Default capabilities for RoyStudio Desktop",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "core:event:default",
+    "dialog:default",
+    "fs:default",
+    "updater:default",
+    "process:default",
+    "process:allow-restart"
+  ]
+}

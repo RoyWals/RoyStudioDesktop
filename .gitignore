@@ -1,0 +1,10 @@
+node_modules/
+src-tauri/target/
+RoyStudioDesktop.exe
+src-tauri/resources/runners/*.exe
+resources/runners/*.exe
+*.WebView2/
+dist/
+*.key
+$HOME/
+WebView2Loader.dll
