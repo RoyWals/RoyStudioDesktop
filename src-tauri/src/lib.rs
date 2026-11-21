@@ -19,27 +19,32 @@ pub struct FileEntry {
 }
 
 fn collect_entries(root: &Path, dir: &Path, out: &mut Vec<FileEntry>) -> Result<(), String> {
-    let entries = fs::read_dir(dir).map_err(|e| e.to_string())?;
-    for entry in entries {
-        let entry = entry.map_err(|e| e.to_string())?;
+    let Ok(entries) = fs::read_dir(dir) else {
+        return Ok(());
+    };
+    for entry in entries.flatten() {
+        if out.len() >= 5000 {
+            break;
+        }
         let p = entry.path();
         let name = entry.file_name().to_string_lossy().to_string();
         if name.starts_with('.') || name == "node_modules" || name == "target" {
             continue;
         }
-        let meta = entry.metadata().map_err(|e| e.to_string())?;
-        let rel = p
-            .strip_prefix(root)
-            .map_err(|e| e.to_string())?
-            .to_string_lossy()
-            .replace('\\', "/");
+        let Ok(meta) = entry.metadata() else {
+            continue;
+        };
+        let Ok(stripped) = p.strip_prefix(root) else {
+            continue;
+        };
+        let rel = stripped.to_string_lossy().replace('\\', "/");
         if meta.is_dir() {
             out.push(FileEntry {
                 path: rel,
                 is_dir: true,
                 size: 0,
             });
-            collect_entries(root, &p, out)?;
+            let _ = collect_entries(root, &p, out);
         } else {
             out.push(FileEntry {
                 path: rel,
@@ -274,6 +279,19 @@ fn write_text_absolute(out_path: String, content: String) -> Result<u64, String>
     }
     let bytes = content.as_bytes();
     fs::write(p, bytes).map_err(|e| e.to_string())?;
+    Ok(bytes.len() as u64)
+}
+
+#[tauri::command]
+fn write_base64_absolute(out_path: String, b64: String) -> Result<u64, String> {
+    let p = Path::new(&out_path);
+    if let Some(parent) = p.parent() {
+        fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+    let bytes = base64::engine::general_purpose::STANDARD
+        .decode(b64)
+        .map_err(|e| e.to_string())?;
+    fs::write(p, &bytes).map_err(|e| e.to_string())?;
     Ok(bytes.len() as u64)
 }
 
@@ -634,9 +652,23 @@ fn get_app_version(app: AppHandle) -> String {
 
 #[tauri::command]
 fn get_launch_file() -> Option<String> {
-    std::env::args().skip(1).find(|arg| {
-        matches!(Path::new(arg).extension().and_then(|e| e.to_str()).unwrap_or("").to_ascii_lowercase().as_str(), "roy" | "royson" | "royproj")
-            && Path::new(arg).is_file()
+    std::env::args().skip(1).find_map(|arg| {
+        let p = Path::new(&arg);
+        let ext = p
+            .extension()
+            .and_then(|e| e.to_str())
+            .unwrap_or("")
+            .to_ascii_lowercase();
+        if matches!(
+            ext.as_str(),
+            "roy" | "roylang" | "royson" | "royproj" | "royscene" | "royprefab" | "royanim" | "roymodel" | "roydata" | "lua" | "luau" | "py" | "md"
+        ) && p.is_file() {
+            let resolved = p.canonicalize().unwrap_or_else(|_| p.to_path_buf());
+            let s = resolved.to_string_lossy().to_string();
+            Some(s.strip_prefix(r"\\?\").unwrap_or(&s).to_string())
+        } else {
+            None
+        }
     })
 }
 
@@ -1036,6 +1068,32 @@ fn relaunch_app(app: AppHandle) {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
+            if let Some(w) = app.get_webview_window("main") {
+                let _ = w.unminimize();
+                let _ = w.set_focus();
+            }
+            if let Some(path_str) = args.iter().skip(1).find_map(|arg| {
+                let p = Path::new(arg);
+                let ext = p
+                    .extension()
+                    .and_then(|e| e.to_str())
+                    .unwrap_or("")
+                    .to_ascii_lowercase();
+                if matches!(
+            ext.as_str(),
+            "roy" | "roylang" | "royson" | "royproj" | "royscene" | "royprefab" | "royanim" | "roymodel" | "roydata" | "lua" | "luau" | "py" | "md"
+        ) && p.is_file() {
+                    let resolved = p.canonicalize().unwrap_or_else(|_| p.to_path_buf());
+                    let s = resolved.to_string_lossy().to_string();
+                    Some(s.strip_prefix(r"\\?\").unwrap_or(&s).to_string())
+                } else {
+                    None
+                }
+            }) {
+                let _ = app.emit("open-launch-file", path_str);
+            }
+        }))
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_process::init())
@@ -1054,6 +1112,7 @@ pub fn run() {
                 copy_external_file,
             export_html_file,
             write_text_absolute,
+            write_base64_absolute,
             get_parent_dir,
             export_zip_archive,
             build_standalone_exe,

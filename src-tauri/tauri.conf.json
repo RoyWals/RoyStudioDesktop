@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "RoyStudio Desktop",
-  "version": "1.0.2",
+  "version": "1.1.0",
   "identifier": "dev.roylang.studio",
   "build": {
     "beforeDevCommand": "node serve.mjs",
@@ -26,9 +26,14 @@
   "bundle": {
     "active": true,
     "fileAssociations": [
-      { "ext": ["roy"], "name": "RoyLang Source", "description": "Исходный файл RoyLang", "role": "Editor" },
+      { "ext": ["roy", "roylang"], "name": "RoyLang Source", "description": "Исходный файл RoyLang", "role": "Editor" },
       { "ext": ["royson"], "name": "RoySON Data", "description": "Файл данных RoySON", "role": "Editor" },
-      { "ext": ["royproj"], "name": "RoyLang Project", "description": "Проект RoyLang", "role": "Editor" }
+      { "ext": ["royproj"], "name": "RoyLang Project", "description": "Проект RoyLang", "role": "Editor" },
+      { "ext": ["royscene"], "name": "RoyLang Scene", "description": "Сцена и уровень RoyLang", "role": "Editor" },
+      { "ext": ["royprefab"], "name": "RoyLang Prefab", "description": "Префаб сущности RoyLang", "role": "Editor" },
+      { "ext": ["royanim"], "name": "RoyLang Animation", "description": "Таймлайн-анимация RoyLang", "role": "Editor" },
+      { "ext": ["roymodel"], "name": "RoyLang Model", "description": "ИИ/ML-модель RoyLang", "role": "Editor" },
+      { "ext": ["roydata"], "name": "RoyLang Dataset", "description": "Датасет ML/SFT RoyLang", "role": "Editor" }
     ],
     "targets": [
       "nsis"

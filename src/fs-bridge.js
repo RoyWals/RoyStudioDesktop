@@ -25,15 +25,18 @@ on draw {
   drawGrid(40, "rgba(56,189,248,0.08)")
   drawGlow(x, y, 42, "#38bdf8", 0.35)
   drawCircle(x, y, 16, "#38bdf8")
-  text("RoyStudio Desktop v6.5", 240, 32, "#e879f9", 18, "center")
+  text("RoyStudio Desktop v6.9", 240, 32, "#e879f9", 18, "center")
   text("Стрелки / WASD — движение", 240, 60, "#94a3b8", 13, "center")
 }
 `
 };
 
 const TEXT_EXTS = new Set([
-  'roy', 'roylang', 'royson', 'royproj', 'html', 'htm', 'css', 'js', 'mjs', 'cjs', 'ts', 'jsx', 'tsx',
-  'json', 'md', 'txt', 'csv', 'toml', 'yaml', 'yml', 'env', 'svg', 'xml', 'rules'
+  'roy', 'roylang', 'royson', 'royproj', 'royscene', 'royprefab', 'royanim', 'roymodel', 'roydata',
+  'tmj', 'tmx', 'ldtk', 'obj', 'mtl', 'gltf', 'glsl', 'frag', 'vert', 'wgsl', 'hlsl',
+  'lua', 'luau', 'py', 'fnt', 'ini', 'cfg', 'bat', 'ps1', 'sh', 'sql', 'rs', 'cs', 'cpp', 'c', 'h', 'hpp',
+  'html', 'htm', 'css', 'js', 'mjs', 'cjs', 'ts', 'jsx', 'tsx',
+  'json', 'jsonl', 'md', 'txt', 'csv', 'toml', 'yaml', 'yml', 'env', 'svg', 'xml', 'rules'
 ]);
 
 const MEDIA_MIME = {
@@ -41,13 +44,27 @@ const MEDIA_MIME = {
   jpg: 'image/jpeg',
   jpeg: 'image/jpeg',
   webp: 'image/webp',
+  avif: 'image/avif',
   gif: 'image/gif',
   bmp: 'image/bmp',
   ico: 'image/x-icon',
   svg: 'image/svg+xml',
   mp3: 'audio/mpeg',
   ogg: 'audio/ogg',
-  wav: 'audio/wav'
+  wav: 'audio/wav',
+  flac: 'audio/flac',
+  m4a: 'audio/mp4',
+  mid: 'audio/midi',
+  midi: 'audio/midi',
+  webm: 'video/webm',
+  mp4: 'video/mp4',
+  ttf: 'font/ttf',
+  otf: 'font/otf',
+  woff: 'font/woff',
+  woff2: 'font/woff2',
+  glb: 'model/gltf-binary',
+  gltf: 'model/gltf+json',
+  obj: 'text/plain'
 };
 
 export function getExt(path) {
@@ -63,7 +80,7 @@ export function isTextFile(path) {
 }
 
 export function isImageFile(path) {
-  return ['png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp', 'ico', 'svg'].includes(getExt(path));
+  return ['png', 'jpg', 'jpeg', 'webp', 'avif', 'gif', 'bmp', 'ico', 'svg'].includes(getExt(path));
 }
 
 export function isMediaFile(path) {
@@ -439,6 +456,16 @@ export function createFsBridge() {
       a.click();
       URL.revokeObjectURL(url);
       return content.length;
+    },
+
+    async writeBase64Absolute(outPath, b64) {
+      if (!isTauriEnv()) return 0;
+      return tauriInvoke('write_base64_absolute', { outPath, b64 });
+    },
+
+    async scanProjectEntries() {
+      if (!isTauriEnv() || mode !== 'tauri' || !rootPath) return [];
+      return tauriInvoke('scan_project', { root: rootPath });
     },
 
     async exportZipArchive(outPath, entries) {

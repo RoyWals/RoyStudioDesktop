@@ -8,7 +8,8 @@ import {
   sortSemverDesc
 } from './core/engine-manager.js';
 import { createFsBridge, isTauriEnv, isTextFile, isImageFile, isMediaFile, getExt } from './fs-bridge.js';
-import { createRoyEditor, detectMonacoLang, updateRoyLanguageMeta } from './editor/monaco-roy.js';
+import { createRoyEditor, createSecondaryEditor, detectMonacoLang, updateRoyLanguageMeta, updateRoyAnalysis } from './editor/monaco-roy.js';
+import { sendStudioCmd, renderImageGridOverlay, packFolderToSpriteAtlas, PROJECT_TEMPLATES } from './studio-extras.js';
 
 const fsBridge = createFsBridge();
 
@@ -197,6 +198,91 @@ function getFileIconSvg(path) {
       <path d="M9.1 5.3c.9 0 1.3.4 1.3 1.2v1.1c0 .5.3.8.8.9v.1c-.5.1-.8.4-.8.9v1.1c0 .8-.4 1.2-1.3 1.2" fill="none" stroke="url(#rsg)" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round"/>
     </svg>`;
   }
+  if (ext === 'royscene') {
+    // Сцена .royscene: кристалл с S
+    return `<svg viewBox="0 0 16 16" width="15" height="15">
+      <defs><linearGradient id="rsce" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#38bdf8"/><stop offset="100%" stop-color="#818cf8"/></linearGradient></defs>
+      <polygon points="8,1 14.5,5 12.5,14 3.5,14 1.5,5" fill="#131624" stroke="url(#rsce)" stroke-width="1.3"/>
+      <text x="8" y="11.2" text-anchor="middle" font-size="7.8" font-weight="800" fill="url(#rsce)" font-family="sans-serif">S</text>
+    </svg>`;
+  }
+  if (ext === 'royprefab') {
+    // Префаб .royprefab: кристалл с E
+    return `<svg viewBox="0 0 16 16" width="15" height="15">
+      <defs><linearGradient id="rpref" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#fbbf24"/><stop offset="100%" stop-color="#f43f5e"/></linearGradient></defs>
+      <polygon points="8,1 14.5,5 12.5,14 3.5,14 1.5,5" fill="#131624" stroke="url(#rpref)" stroke-width="1.3"/>
+      <text x="8" y="11.2" text-anchor="middle" font-size="7.8" font-weight="800" fill="url(#rpref)" font-family="sans-serif">E</text>
+    </svg>`;
+  }
+  if (ext === 'royanim') {
+    // Таймлайн-анимация .royanim: кристалл с ▶
+    return `<svg viewBox="0 0 16 16" width="15" height="15">
+      <defs><linearGradient id="ranim" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#f472b6"/><stop offset="100%" stop-color="#a855f7"/></linearGradient></defs>
+      <polygon points="8,1 14.5,5 12.5,14 3.5,14 1.5,5" fill="#131624" stroke="url(#ranim)" stroke-width="1.3"/>
+      <polygon points="6.4,5.4 11,8.3 6.4,11.2" fill="url(#ranim)"/>
+    </svg>`;
+  }
+  if (ext === 'roymodel') {
+    // ML/NanoGPT модель .roymodel: кристалл с M
+    return `<svg viewBox="0 0 16 16" width="15" height="15">
+      <defs><linearGradient id="rmod" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#2dd4bf"/><stop offset="100%" stop-color="#a3e635"/></linearGradient></defs>
+      <polygon points="8,1 14.5,5 12.5,14 3.5,14 1.5,5" fill="#131624" stroke="url(#rmod)" stroke-width="1.3"/>
+      <text x="8" y="11.2" text-anchor="middle" font-size="7.4" font-weight="800" fill="url(#rmod)" font-family="sans-serif">M</text>
+    </svg>`;
+  }
+  if (ext === 'roydata') {
+    // Датасет .roydata: кристалл с D
+    return `<svg viewBox="0 0 16 16" width="15" height="15">
+      <defs><linearGradient id="rdata" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#60a5fa"/><stop offset="100%" stop-color="#22d3ee"/></linearGradient></defs>
+      <polygon points="8,1 14.5,5 12.5,14 3.5,14 1.5,5" fill="#131624" stroke="url(#rdata)" stroke-width="1.3"/>
+      <text x="8" y="11.2" text-anchor="middle" font-size="7.8" font-weight="800" fill="url(#rdata)" font-family="sans-serif">D</text>
+    </svg>`;
+  }
+  if (ext === 'lua' || ext === 'luau') {
+    return `<svg viewBox="0 0 16 16" width="14" height="14"><circle cx="8" cy="8.5" r="5.5" fill="#1e3a8a" stroke="#60a5fa" stroke-width="1.2"/><circle cx="10.2" cy="6.2" r="1.4" fill="#93c5fd"/><circle cx="13" cy="3.2" r="1.3" fill="#60a5fa"/></svg>`;
+  }
+  if (ext === 'py') {
+    return `<svg viewBox="0 0 16 16" width="14" height="14"><rect x="1" y="1" width="14" height="14" rx="2.5" fill="#1e3a5f" stroke="#38bdf8" stroke-width="1"/><text x="8" y="11.4" text-anchor="middle" font-size="7.5" font-weight="800" fill="#fde047" font-family="sans-serif">PY</text></svg>`;
+  }
+  if (ext === 'tmj' || ext === 'tmx' || ext === 'ldtk') {
+    return `<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="#34d399" stroke-width="1.2"><rect x="2" y="2" width="12" height="12" rx="1.5"/><line x1="2" y1="6" x2="14" y2="6"/><line x1="2" y1="10" x2="14" y2="10"/><line x1="6" y1="2" x2="6" y2="14"/><line x1="10" y1="2" x2="10" y2="14"/></svg>`;
+  }
+  if (ext === 'glb' || ext === 'gltf' || ext === 'obj' || ext === 'mtl') {
+    return `<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="#22d3ee" stroke-width="1.25" stroke-linejoin="round"><polygon points="8,1.5 14,4.8 14,11.2 8,14.5 2,11.2 2,4.8"/><polyline points="2,4.8 8,8 14,4.8"/><line x1="8" y1="8" x2="8" y2="14.5"/></svg>`;
+  }
+  if (ext === 'glsl' || ext === 'frag' || ext === 'vert' || ext === 'wgsl' || ext === 'hlsl') {
+    return `<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="#fb923c" stroke-width="1.3" stroke-linecap="round"><polygon points="8,1.8 13.5,5.5 11.5,13.2 4.5,13.2 2.5,5.5"/><circle cx="8" cy="8.2" r="2.1" fill="#fb923c"/></svg>`;
+  }
+  if (ext === 'ttf' || ext === 'otf' || ext === 'woff' || ext === 'woff2' || ext === 'fnt') {
+    return `<svg viewBox="0 0 16 16" width="14" height="14"><rect x="1.5" y="2" width="13" height="12" rx="2" fill="#232733" stroke="#94a3b8" stroke-width="1.1"/><text x="8" y="11.3" text-anchor="middle" font-size="8.2" font-weight="700" fill="#e2e8f0" font-family="serif">Aa</text></svg>`;
+  }
+  if (ext === 'csv' || ext === 'jsonl') {
+    return `<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="#4ade80" stroke-width="1.25"><rect x="2" y="2" width="12" height="12" rx="1.5"/><line x1="2" y1="5.5" x2="14" y2="5.5"/><line x1="2" y1="9.5" x2="14" y2="9.5"/><line x1="7" y1="5.5" x2="7" y2="14"/></svg>`;
+  }
+  if (ext === 'mp3' || ext === 'ogg' || ext === 'wav' || ext === 'flac' || ext === 'm4a' || ext === 'mid' || ext === 'midi') {
+    return `<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="#f472b6" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round"><path d="M6 12V4.5l6.5-1.5v7.5"/><circle cx="4.3" cy="12" r="1.7" fill="#f472b6"/><circle cx="10.8" cy="10.5" r="1.7" fill="#f472b6"/></svg>`;
+  }
+  if (ext === 'webm' || ext === 'mp4') {
+    return `<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="#fb7185" stroke-width="1.3"><rect x="1.5" y="3" width="13" height="10" rx="1.5"/><polygon points="6.5,5.5 11,8 6.5,10.5" fill="#fb7185"/></svg>`;
+  }
+  if (ext === 'ini' || ext === 'cfg') {
+    return `<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="#94a3b8" stroke-width="1.3" stroke-linecap="round"><line x1="3" y1="4.5" x2="13" y2="4.5"/><circle cx="6.5" cy="4.5" r="1.4" fill="#94a3b8"/><line x1="3" y1="8.5" x2="13" y2="8.5"/><circle cx="10.5" cy="8.5" r="1.4" fill="#94a3b8"/><line x1="3" y1="12.5" x2="13" y2="12.5"/><circle cx="5.5" cy="12.5" r="1.4" fill="#94a3b8"/></svg>`;
+  }
+  if (ext === 'bat' || ext === 'ps1' || ext === 'sh') {
+    return `<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="#4ade80" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><rect x="1.5" y="2.5" width="13" height="11" rx="1.5" stroke="#475569"/><polyline points="4.5,6 7,8.5 4.5,11"/><line x1="8.5" y1="11" x2="11.5" y2="11"/></svg>`;
+  }
+  if (ext === 'sql') {
+    return `<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="#38bdf8" stroke-width="1.25"><ellipse cx="8" cy="4.2" rx="5" ry="2"/><path d="M3 4.2v7.6c0 1.1 2.2 2 5 2s5-.9 5-2V4.2"/><path d="M3 8c0 1.1 2.2 2 5 2s5-.9 5-2"/></svg>`;
+  }
+  if (ext === 'rs') {
+    return `<svg viewBox="0 0 16 16" width="14" height="14"><rect x="1" y="1" width="14" height="14" rx="2" fill="#2a1e17" stroke="#f97316" stroke-width="1"/><text x="8" y="11.4" text-anchor="middle" font-size="7.5" font-weight="800" fill="#fb923c" font-family="sans-serif">RS</text></svg>`;
+  }
+  if (ext === 'cs') {
+    return `<svg viewBox="0 0 16 16" width="14" height="14"><rect x="1" y="1" width="14" height="14" rx="2" fill="#2b1e3e" stroke="#a855f7" stroke-width="1"/><text x="8" y="11.4" text-anchor="middle" font-size="7.5" font-weight="800" fill="#e9d5ff" font-family="sans-serif">C#</text></svg>`;
+  }
+  if (ext === 'cpp' || ext === 'c' || ext === 'h' || ext === 'hpp') {
+    return `<svg viewBox="0 0 16 16" width="14" height="14"><rect x="1" y="1" width="14" height="14" rx="2" fill="#1b2b44" stroke="#60a5fa" stroke-width="1"/><text x="8" y="11.4" text-anchor="middle" font-size="7.2" font-weight="800" fill="#93c5fd" font-family="sans-serif">${ext === 'c' ? 'C' : (ext.startsWith('h') ? 'H' : 'C+')}</text></svg>`;
+  }
   if (ext === 'js' || ext === 'mjs' || ext === 'cjs') {
     return `<svg viewBox="0 0 16 16" width="14" height="14"><rect x="1" y="1" width="14" height="14" rx="2" fill="#f7df1e"/><text x="8" y="12" text-anchor="middle" font-size="8.5" font-weight="800" fill="#111" font-family="sans-serif">JS</text></svg>`;
   }
@@ -236,11 +322,43 @@ function addLog(msg, kind = 'info') {
   state.logs.push({ msg, kind, t: new Date().toLocaleTimeString() });
   if (state.logs.length > 200) state.logs.shift();
   el('logCount').textContent = state.logs.length;
-  const pane = el('consolePane');
-  pane.innerHTML = state.logs.map(l =>
-    `<div class="log-row ${l.kind}">[${l.t}] ${escapeHtml(l.msg)}</div>`
-  ).join('');
+  const pane = el('consoleLogs') || el('consolePane');
+  const row = document.createElement('div');
+  row.className = `log-row ${kind}`;
+  row.textContent = `[${state.logs[state.logs.length - 1].t}] ${msg}`;
+  pane.appendChild(row);
+  while (pane.children.length > 200) pane.firstElementChild.remove();
   pane.scrollTop = pane.scrollHeight;
+}
+
+function addCrashReport(d) {
+  const pane = el('consoleLogs') || el('consolePane');
+  const file = d.file || state.entryFile || 'main.roy';
+  const line = Number(d.line) || 1;
+  const msg = d.message || d.raw || 'Ошибка выполнения';
+  state.logs.push({ msg, kind: 'err', t: new Date().toLocaleTimeString() });
+  el('logCount').textContent = state.logs.length;
+
+  const card = document.createElement('div');
+  card.className = 'crash-card';
+  const framesTxt = Array.isArray(d.digest) && d.digest.length
+    ? d.digest.slice(-12).map(f => `frame #${f.frame ?? '?'}: dt=${Number(f.dt || 0).toFixed(4)} scene=${f.scene || 'main'} ents=${f.entities ?? 0}`).join('\n')
+    : '';
+  card.innerHTML = `
+    <div class="crash-head">
+      <span>💥 ${escapeHtml(msg)}</span>
+      <button class="crash-loc" title="Перейти к строке">${escapeHtml(file)}:${line}</button>
+    </div>
+    ${framesTxt ? `<details><summary style="cursor:pointer;color:#94a3b8;font-size:11px;margin-top:4px;">Последние кадры (crashReport)</summary><pre class="crash-frames">${escapeHtml(framesTxt)}</pre></details>` : ''}
+  `;
+  card.querySelector('.crash-loc')?.addEventListener('click', () => {
+    if (state.textFiles[file] != null) openFile(file, line);
+    else if (editor) editor.revealLine(line);
+  });
+  pane.appendChild(card);
+  pane.scrollTop = pane.scrollHeight;
+  toggleBottomPanel(true);
+  document.querySelector('.btab[data-tab="console"]')?.click();
 }
 
 function findManifestFile() {
@@ -456,18 +574,41 @@ function renderTabs() {
 
 function showImageTab(path) {
   const url = state.assetUrls[path];
-  el('editorHost').classList.add('hidden');
+  el('welcomeScreen')?.classList.add('hidden');
+  el('editorSplitWrap')?.classList.add('hidden');
   el('imageViewer').classList.remove('hidden');
-  el('ivStage').innerHTML = '<img id="ivImg" alt="Preview" />';
+  el('ivStage').innerHTML = '<div class="iv-grid-wrap"><img id="ivImg" alt="Preview" /></div>';
   const img = el('ivImg');
+  let zoom = 1;
+  let gridSize = 0;
+  const applyGrid = () => {
+    renderImageGridOverlay(el('ivStage'), img, gridSize, (tile) => {
+      const snippet = `${tile.x}, ${tile.y}, ${tile.w}, ${tile.h}`;
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(snippet).catch(() => {});
+      el('ivMeta').textContent = `${path} · ${img.naturalWidth}×${img.naturalHeight} · Тайл [${tile.col},${tile.row}] (${snippet}) скопирован`;
+    });
+  };
   img.onload = () => {
     el('ivMeta').textContent = `${path} · ${img.naturalWidth} × ${img.naturalHeight} px`;
+    applyGrid();
   };
   img.src = url || '';
   el('ivMeta').textContent = path;
-  el('ivControls').innerHTML = '<button id="ivZoomOut">−</button><span id="ivZoomValue">100%</span><button id="ivZoomIn">+</button><button id="ivZoomReset">Сбросить</button>';
-  let zoom = 1;
-  const applyZoom = () => { img.style.transform = `scale(${zoom})`; el('ivZoomValue').textContent = `${Math.round(zoom * 100)}%`; };
+  el('ivControls').innerHTML = `
+    <select id="ivGridSelect" title="Сетка тайлов для спрайтшитов">
+      <option value="0">Сетка: Выкл</option>
+      <option value="16">Сетка: 16×16</option>
+      <option value="32">Сетка: 32×32</option>
+      <option value="64">Сетка: 64×64</option>
+    </select>
+    <button id="ivZoomOut">−</button><span id="ivZoomValue">100%</span><button id="ivZoomIn">+</button><button id="ivZoomReset">Сбросить</button>
+  `;
+  const applyZoom = () => {
+    img.style.transform = `scale(${zoom})`;
+    el('ivZoomValue').textContent = `${Math.round(zoom * 100)}%`;
+    setTimeout(applyGrid, 20);
+  };
+  el('ivGridSelect').onchange = (e) => { gridSize = Number(e.target.value) || 0; applyGrid(); };
   el('ivZoomOut').onclick = () => { zoom = Math.max(.2, zoom - .1); applyZoom(); };
   el('ivZoomIn').onclick = () => { zoom = Math.min(5, zoom + .1); applyZoom(); };
   el('ivZoomReset').onclick = () => { zoom = 1; applyZoom(); };
@@ -475,19 +616,74 @@ function showImageTab(path) {
 }
 
 function showAudioTab(path) {
-  el('editorHost').classList.add('hidden'); el('imageViewer').classList.remove('hidden');
+  el('welcomeScreen')?.classList.add('hidden');
+  el('editorSplitWrap')?.classList.add('hidden');
+  el('imageViewer').classList.remove('hidden');
+  const url = state.assetUrls[path];
+  const ext = getExt(path);
+  el('ivMeta').textContent = path;
+  el('ivControls').innerHTML = '';
+  if (ext === 'mid' || ext === 'midi') {
+    el('ivStage').innerHTML = `<div class="audio-preview"><div class="audio-icon">🎹</div><div class="muted">MIDI файл (${escapeHtml(path)}) — используйте <code>parseMIDI()</code> в RoyLang</div></div>`;
+    document.querySelector('.sb-lang').textContent = 'MIDI';
+  } else {
+    el('ivStage').innerHTML = `<div class="audio-preview"><div class="audio-icon">♫</div><audio controls src="${escapeHtml(url || '')}"></audio></div>`;
+    document.querySelector('.sb-lang').textContent = 'Аудио';
+  }
+}
+
+function showVideoTab(path) {
+  el('welcomeScreen')?.classList.add('hidden');
+  el('editorSplitWrap')?.classList.add('hidden');
+  el('imageViewer').classList.remove('hidden');
   const url = state.assetUrls[path];
   el('ivMeta').textContent = path;
   el('ivControls').innerHTML = '';
-  el('ivStage').innerHTML = `<div class="audio-preview"><div class="audio-icon">♫</div><audio controls src="${escapeHtml(url || '')}"></audio></div>`;
-  document.querySelector('.sb-lang').textContent = 'Аудио';
+  el('ivStage').innerHTML = `<div class="audio-preview"><video controls src="${escapeHtml(url || '')}" style="max-width:100%;max-height:70vh;border-radius:6px;"></video></div>`;
+  document.querySelector('.sb-lang').textContent = 'Видео';
+}
+
+async function showFontTab(path) {
+  el('welcomeScreen')?.classList.add('hidden');
+  el('editorSplitWrap')?.classList.add('hidden');
+  el('imageViewer').classList.remove('hidden');
+  const url = state.assetUrls[path];
+  el('ivMeta').textContent = `${path} · Предпросмотр шрифта`;
+  el('ivControls').innerHTML = '';
+  const familyName = 'RoyPreviewFont_' + path.replace(/[^a-zA-Z0-9]/g, '_');
+  try {
+    const face = new FontFace(familyName, `url(${url})`);
+    await face.load();
+    document.fonts.add(face);
+  } catch {}
+  const sampleDefault = 'Съешь ещё этих мягких французских булок · The quick brown fox · 0123456789';
+  el('ivStage').innerHTML = `
+    <div style="width:100%;max-width:720px;padding:18px;display:flex;flex-direction:column;gap:12px;color:#e2e8f0;">
+      <input id="fontSampleInput" type="text" value="${escapeHtml(sampleDefault)}" style="background:#121212;color:#fff;border:1px solid #3c3c3c;border-radius:4px;padding:6px 10px;font-size:13px;" />
+      <div id="fontSamplesList" style="font-family:'${escapeHtml(familyName)}', sans-serif;display:flex;flex-direction:column;gap:12px;background:#1f1f1f;border:1px solid #2b2b2b;border-radius:6px;padding:16px;">
+        <div data-fs="14" style="font-size:14px;">${escapeHtml(sampleDefault)}</div>
+        <div data-fs="20" style="font-size:20px;">${escapeHtml(sampleDefault)}</div>
+        <div data-fs="28" style="font-size:28px;">${escapeHtml(sampleDefault)}</div>
+        <div data-fs="40" style="font-size:40px;">${escapeHtml(sampleDefault)}</div>
+      </div>
+    </div>
+  `;
+  el('fontSampleInput')?.addEventListener('input', (e) => {
+    const val = e.target.value || ' ';
+    el('fontSamplesList')?.querySelectorAll('[data-fs]').forEach(d => { d.textContent = val; });
+  });
+  document.querySelector('.sb-lang').textContent = 'Шрифт';
 }
 
 function openFile(path, line = null, fromHistory = false) {
+  const ext = getExt(path);
   const hasText = state.textFiles[path] != null;
   const isImg = isImageFile(path) && state.assetUrls[path] != null;
-  const isAudio = ['mp3', 'ogg', 'wav'].includes(getExt(path)) && state.assetUrls[path] != null;
-  if (!hasText && !isImg && !isAudio) return;
+  const isAudio = ['mp3', 'ogg', 'wav', 'flac', 'm4a', 'mid', 'midi'].includes(ext) && state.assetUrls[path] != null;
+  const isVideo = ['webm', 'mp4'].includes(ext) && state.assetUrls[path] != null;
+  const isFont = ['ttf', 'otf', 'woff', 'woff2'].includes(ext) && state.assetUrls[path] != null;
+  if (!hasText && !isImg && !isAudio && !isVideo && !isFont) return;
+  el('welcomeScreen')?.classList.add('hidden');
   if (!state.openTabs.includes(path)) state.openTabs.push(path);
   if (!fromHistory) {
     if (state.tabHistory[state.tabHistoryIdx] !== path) {
@@ -502,10 +698,15 @@ function openFile(path, line = null, fromHistory = false) {
 
   if (isImg && !hasText) {
     showImageTab(path);
+  } else if (isVideo && !hasText) {
+    showVideoTab(path);
+  } else if (isFont && !hasText) {
+    showFontTab(path);
   } else if (isAudio && !hasText) {
     showAudioTab(path);
   } else {
     el('imageViewer').classList.add('hidden');
+    el('editorSplitWrap')?.classList.remove('hidden');
     el('editorHost').classList.remove('hidden');
     const lang = detectMonacoLang(path);
     if (editor) {
@@ -513,10 +714,39 @@ function openFile(path, line = null, fromHistory = false) {
       editor.setValue(state.textFiles[path]);
       if (line) editor.revealLine(line);
     }
+    const extBadge = {
+      royscene: 'RoyScene',
+      royprefab: 'RoyPrefab',
+      royanim: 'RoyAnim',
+      roymodel: 'RoyModel',
+      roydata: 'RoyData',
+      luau: 'Luau',
+      lua: 'Lua',
+      py: 'Python',
+      glsl: 'GLSL',
+      frag: 'GLSL',
+      vert: 'GLSL',
+      wgsl: 'WGSL',
+      hlsl: 'HLSL',
+      tmx: 'Tiled XML',
+      ini: 'INI',
+      cfg: 'Config',
+      bat: 'Batch',
+      ps1: 'PowerShell',
+      sh: 'Shell',
+      sql: 'SQL',
+      rs: 'Rust',
+      cs: 'C#',
+      cpp: 'C++',
+      c: 'C',
+      h: 'C/C++ Header',
+      hpp: 'C++ Header'
+    }[ext];
     const langLabel =
-      lang === 'roy' ? `RoyLang ${RoyLang.VERSION || 'v6.5'}` :
+      extBadge ||
+      (lang === 'roy' ? `RoyLang ${RoyLang.VERSION || 'v6.9'}` :
       lang === 'royson' ? 'RoySON' :
-      lang === 'royproj' ? 'RoyProj' : lang.toUpperCase();
+      lang === 'royproj' ? 'RoyProj' : lang.toUpperCase());
     document.querySelector('.sb-lang').textContent = langLabel;
   }
 
@@ -648,13 +878,33 @@ function runDiagnostics() {
 
   if (entry && (entry.endsWith('.roy') || entry.endsWith('.roylang'))) {
     state.entryFile = entry;
-    try {
-      const res = RoyLang.compile(royFiles[entry], royFiles, entry);
-      for (const w of (res.warnings || [])) {
-        diags.push({ severity: 'warning', message: w.message || String(w), line: w.line || 1, col: w.col || 1, file: w.file || entry });
+    if (typeof RoyLang.analyze === 'function') {
+      try {
+        const rep = RoyLang.analyze(royFiles[entry], royFiles, entry);
+        updateRoyAnalysis(rep?.symbols || [], {
+          getActiveFile: () => state.activeFile,
+          onOpenFile: (rel, ln) => {
+            if (state.textFiles[rel] != null) openFile(rel, ln || 1);
+          }
+        });
+        for (const e of (rep?.errors || [])) {
+          diags.push({ severity: 'error', message: e.message || String(e), line: e.line || 1, col: e.col || 1, file: e.file || entry });
+        }
+        for (const w of (rep?.warnings || [])) {
+          diags.push({ severity: 'warning', message: w.message || String(w), line: w.line || 1, col: w.col || 1, file: w.file || entry });
+        }
+      } catch (err) {
+        diags.push({ severity: 'error', message: err.message || String(err), line: err.royLine || err.line || 1, col: err.royCol || err.col || 1, file: err.royFile || err.fileName || entry });
       }
-    } catch (err) {
-      diags.push({ severity: 'error', message: err.message || String(err), line: err.royLine || err.line || 1, col: err.royCol || err.col || 1, file: err.royFile || err.fileName || entry });
+    } else {
+      try {
+        const res = RoyLang.compile(royFiles[entry], royFiles, entry);
+        for (const w of (res.warnings || [])) {
+          diags.push({ severity: 'warning', message: w.message || String(w), line: w.line || 1, col: w.col || 1, file: w.file || entry });
+        }
+      } catch (err) {
+        diags.push({ severity: 'error', message: err.message || String(err), line: err.royLine || err.line || 1, col: err.royCol || err.col || 1, file: err.royFile || err.fileName || entry });
+      }
     }
   }
 
@@ -666,6 +916,16 @@ function runDiagnostics() {
         for (const e of (v.errors || [])) {
           diags.push({ severity: 'error', message: e.message || String(e), line: e.line || 1, col: e.col || 1, file: state.activeFile });
         }
+      } else if (typeof RoyLang.validateRoysonSchema === 'function') {
+        try {
+          const parsed = RoyLang.parseRoyson(code);
+          const sv = RoyLang.validateRoysonSchema(parsed);
+          if (sv && !sv.ok) {
+            for (const e of (sv.errors || [])) {
+              diags.push({ severity: 'warning', message: e.message || String(e), line: e.line || 1, col: e.col || 1, file: state.activeFile });
+            }
+          }
+        } catch {}
       }
     } else if (state.activeFile.endsWith('.royproj') && typeof RoyLang.parseRoyproj === 'function') {
       try {
@@ -678,6 +938,36 @@ function runDiagnostics() {
           col: err.royCol || err.col || 1,
           file: state.activeFile
         });
+      }
+    }
+  }
+
+  // Проверка битых путей ассетов в .roy файлах
+  const knownFiles = new Set([
+    ...state.allFiles,
+    ...Object.keys(state.textFiles),
+    ...Object.keys(state.assetUrls)
+  ].map(p => String(p).replace(/^\.\//, '').replace(/^\/+/, '').toLowerCase()));
+  const assetCallRe = /\b(?:loadSprite|loadImage|loadSound|loadMusic|playMusic|loadFont|loadTilemap|loadModel3D|loadObj3D|loadJson|loadRoyson)\s*\(\s*["']([^"']+)["']/g;
+  const assetExtRe = /\.(?:png|jpe?g|webp|avif|gif|svg|bmp|mp3|ogg|wav|flac|m4a|mid|midi|webm|mp4|json|jsonl|csv|royson|royscene|royprefab|royanim|roymodel|roydata|tmj|tmx|ldtk|obj|mtl|gltf|glb|ttf|otf|woff2?|fnt)$/i;
+  for (const [file, code] of Object.entries(royFiles)) {
+    const lines = String(code || '').split('\n');
+    for (let li = 0; li < lines.length; li++) {
+      assetCallRe.lastIndex = 0;
+      let m;
+      while ((m = assetCallRe.exec(lines[li])) !== null) {
+        const rawPath = m[1].trim();
+        if (!rawPath || /^(?:https?:|data:|blob:)/i.test(rawPath) || !assetExtRe.test(rawPath)) continue;
+        const norm = rawPath.replace(/^\.\//, '').replace(/^\/+/, '').toLowerCase();
+        if (!knownFiles.has(norm)) {
+          diags.push({
+            severity: 'warning',
+            message: `Ассет не найден в проекте: "${rawPath}"`,
+            line: li + 1,
+            col: m.index + 1,
+            file
+          });
+        }
       }
     }
   }
@@ -784,6 +1074,12 @@ function injectAssetAndLogBridge(html, includeLogBridge = true, embedDataUrls = 
       console.warn = function(){ send('warn', arguments); oWarn.apply(console, arguments); };
       console.error = function(){ send('err', arguments); oErr.apply(console, arguments); };
       window.addEventListener('error', function(e){ send('err', [e.message + ' (' + e.lineno + ')']); });
+      window.addEventListener('keydown', function(e){
+        if (e.code === 'F5' || e.key === 'F5') {
+          e.preventDefault();
+          try { parent.postMessage({ type: 'roystudio-action', action: 'rerun' }, '*'); } catch {}
+        }
+      });
     })();
   <\/script>` : '';
 
@@ -813,7 +1109,12 @@ function buildCompiledOutput(includeLogBridge = true, opts = {}) {
   const embedDataUrls = Boolean(opts.embedDataUrls);
   if (entry.endsWith('.roy') || entry.endsWith('.roylang')) {
     const projectFiles = collectProjectFilesForCompiler();
-    const rawHtml = RoyLang.compileToHtml(state.textFiles[entry], { title }, projectFiles, entry);
+    const compileOpts = {
+      release: Boolean(opts.release),
+      minify: Boolean(opts.minify),
+      treeShake: opts.treeShake !== false
+    };
+    const rawHtml = RoyLang.compileToHtml(state.textFiles[entry], { title }, projectFiles, entry, compileOpts);
     return {
       entry,
       count: Object.keys(getRoyOnlyFiles()).length,
@@ -858,6 +1159,25 @@ async function saveActiveFile() {
   renderTree();
   renderTabs();
   addLog(`Сохранено: ${state.activeFile}`, 'info');
+
+  const hotEnabled = el('chkHotSwap')?.checked && el('previewFrame')?.contentWindow;
+  if (hotEnabled) {
+    const f = state.activeFile;
+    if (f.endsWith('.roy') || f.endsWith('.roylang')) {
+      try {
+        const royFiles = getRoyOnlyFiles();
+        const entry = pickEntryFile() || f;
+        const compiled = RoyLang.compile(royFiles[entry], royFiles, entry);
+        if (compiled && compiled.jsCode) {
+          sendStudioCmd(el('previewFrame'), { cmd: 'hotCode', code: compiled.jsCode });
+          return;
+        }
+      } catch {}
+    } else if (/\.(royson|royproj|royscene|royprefab|royanim|roydata|json)$/i.test(f)) {
+      sendStudioCmd(el('previewFrame'), { cmd: 'hotData', path: f, content: state.textFiles[f] });
+      return;
+    }
+  }
   compileAndRun();
 }
 
@@ -980,7 +1300,9 @@ function formatActiveDocument() {
   const raw = state.textFiles[state.activeFile];
   try {
     let formatted = null;
-    if (state.activeFile.endsWith('.royson') && typeof RoyLang.parseRoyson === 'function' && typeof RoyLang.stringifyRoyson === 'function') {
+    if ((state.activeFile.endsWith('.roy') || state.activeFile.endsWith('.roylang')) && typeof RoyLang.format === 'function') {
+      formatted = RoyLang.format(raw);
+    } else if (state.activeFile.endsWith('.royson') && typeof RoyLang.parseRoyson === 'function' && typeof RoyLang.stringifyRoyson === 'function') {
       const val = RoyLang.parseRoyson(raw, { strict: true });
       formatted = RoyLang.stringifyRoyson(val, { indent: 2, pretty: true, unquotedKeys: true }) + '\n';
     } else if (state.activeFile.endsWith('.json')) {
@@ -1125,6 +1447,8 @@ async function runBuildPipeline() {
     const bg = el('bldBg').value.trim() || '#0b0f1a';
     const outDirRaw = el('bldOutDir').value.trim() || 'dist';
     const iconPath = el('bldIcon').value.trim();
+    const release = el('bldRelease')?.checked !== false;
+    const treeShake = el('bldTreeShake')?.checked !== false;
     const singleFile = el('bldSingleFile').checked;
     const includeSrc = el('bldIncludeSrc').checked;
     const fullscreen = el('bldFullscreen').checked;
@@ -1190,7 +1514,7 @@ async function runBuildPipeline() {
 
     if (buildModalTarget === 'html') {
       setBuildLog('Компиляция HTML...');
-      const built = buildCompiledOutput(false, { embedDataUrls: singleFile, entryOverride: entry, titleOverride: name });
+      const built = buildCompiledOutput(false, { embedDataUrls: singleFile, entryOverride: entry, titleOverride: name, release, minify: release, treeShake });
       let outPath = null;
       if (isTauriEnv()) {
         if (isAbsBuildPath(outDirRaw)) outPath = joinBuildPath(outDirRaw, `${slug}.html`);
@@ -1206,13 +1530,37 @@ async function runBuildPipeline() {
       el('buildResultInfo').textContent = `${slug}.html · ${formatBytesSize(written || built.html.length)}`;
       setBuildLog(`Готово!\nФайл: ${outPath}\nРазмер: ${formatBytesSize(written || built.html.length)}`);
       addLog(`HTML собран: ${outPath}`, 'info');
+    } else if (buildModalTarget === 'pwa') {
+      if (typeof RoyLang.compileToPwaFiles !== 'function') throw new Error('compileToPwaFiles недоступен в текущей версии движка');
+      setBuildLog('Компиляция PWA (manifest, sw.js, index.html)...');
+      const projectFiles = collectProjectFilesForCompiler();
+      const pwa = RoyLang.compileToPwaFiles(state.textFiles[entry], { title: name }, projectFiles, entry, { release, minify: release, treeShake });
+      const pwaFiles = pwa?.files || pwa || {};
+      const entries = Object.entries(pwaFiles).map(([p, content]) => ({
+        path: p,
+        is_base64: false,
+        data: typeof content === 'string' ? content : JSON.stringify(content, null, 2)
+      }));
+      if (isTauriEnv()) {
+        const dir = await resolveOutDir();
+        if (!dir) { setBuildLog('Сохранение отменено.'); return; }
+        const outZip = joinBuildPath(dir, `${slug}-pwa.zip`);
+        const bytes = await fsBridge.exportZipArchive(outZip, entries);
+        lastBuildDirPath = dir;
+        el('btnOpenBuildDir').disabled = false;
+        el('buildResultInfo').textContent = `${slug}-pwa.zip · ${formatBytesSize(bytes)} (${entries.length} файл.)`;
+        setBuildLog(`PWA-пакет собран!\nАрхив: ${outZip}\nФайлов: ${entries.length} · Размер: ${formatBytesSize(bytes)}`);
+        addLog(`PWA собран: ${outZip}`, 'info');
+      } else {
+        setBuildLog(`PWA-пакет сгенерирован (${entries.length} файл.)`);
+      }
     } else if (buildModalTarget === 'zip') {
       if (!isTauriEnv()) throw new Error('ZIP-сборка на диск доступна в настольном RoyStudio Desktop');
       setBuildLog('Сборка игры и упаковка ZIP...');
       const dir = await resolveOutDir();
       const outZip = dir ? joinBuildPath(dir, `${slug}.zip`) : await fsBridge.pickSaveFile(`${slug}.zip`, 'ZIP Archive', 'zip');
       if (!outZip) { setBuildLog('Сохранение отменено.'); return; }
-      const built = buildCompiledOutput(false, { embedDataUrls: singleFile, entryOverride: entry, titleOverride: name });
+      const built = buildCompiledOutput(false, { embedDataUrls: singleFile, entryOverride: entry, titleOverride: name, release, minify: release, treeShake });
       const entries = [{ path: 'index.html', is_base64: false, data: built.html }];
       const seen = new Set(['index.html']);
       if (!singleFile) {
@@ -1275,7 +1623,7 @@ async function runBuildPipeline() {
       const dir = await resolveOutDir();
       if (!dir) { setBuildLog('Сборка отменена: не выбрана папка вывода.'); return; }
       setBuildLog('Компиляция игры и сборка standalone Windows .exe...');
-      const built = buildCompiledOutput(false, { embedDataUrls: true, entryOverride: entry, titleOverride: name });
+      const built = buildCompiledOutput(false, { embedDataUrls: true, entryOverride: entry, titleOverride: name, release, minify: release, treeShake });
       const cfgJson = JSON.stringify({ title: name, width, height, bg, fullscreen, resizable });
       const res = await fsBridge.buildStandaloneExe(state.rootPath, dir, slug, cfgJson, built.html, iconPath);
        lastBuildDirPath = dir;
@@ -1295,7 +1643,66 @@ async function runBuildPipeline() {
   }
 }
 
-function loadProjectState(proj) {
+const SESSION_KEY_PREFIX = 'roystudio.session.v1:';
+function getSessionKey(rootPath = state.rootPath) {
+  return SESSION_KEY_PREFIX + (rootPath || '__demo__');
+}
+function saveIdeSession() {
+  try {
+    const drafts = {};
+    for (const rel of state.dirty) {
+      if (state.textFiles[rel] != null && state.textFiles[rel].length <= 200000) {
+        drafts[rel] = state.textFiles[rel];
+      }
+    }
+    const pos = editor && typeof editor.getPosition === 'function' ? editor.getPosition() : { line: 1, col: 1 };
+    const payload = {
+      openTabs: state.openTabs.slice(0, 30),
+      activeFile: state.activeFile,
+      cursor: pos,
+      drafts
+    };
+    localStorage.setItem(getSessionKey(), JSON.stringify(payload));
+  } catch {}
+}
+function restoreIdeSession(rootPath, skipActiveOpen = false) {
+  try {
+    const raw = localStorage.getItem(getSessionKey(rootPath));
+    if (!raw) return false;
+    const s = JSON.parse(raw);
+    if (!s || typeof s !== 'object') return false;
+    if (s.drafts && typeof s.drafts === 'object') {
+      for (const [rel, txt] of Object.entries(s.drafts)) {
+        if (typeof txt === 'string' && state.textFiles[rel] != null && state.textFiles[rel] !== txt) {
+          state.textFiles[rel] = txt;
+          state.dirty.add(rel);
+        }
+      }
+    }
+    const validTabs = (Array.isArray(s.openTabs) ? s.openTabs : []).filter(
+      p => state.textFiles[p] != null || state.assetUrls[p] != null
+    );
+    if (!validTabs.length) return false;
+    state.openTabs = validTabs;
+    if (!skipActiveOpen) {
+      const target = (s.activeFile && validTabs.includes(s.activeFile)) ? s.activeFile : validTabs[0];
+      openFile(target);
+      if (editor && typeof editor.setPosition === 'function' && s.cursor) {
+        editor.setPosition(s.cursor.line, s.cursor.col);
+      }
+    } else {
+      renderTree();
+      renderTabs();
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+window.addEventListener('beforeunload', () => saveIdeSession());
+
+function loadProjectState(proj, opts = {}) {
+  lastWatcherSig = null;
   state.rootPath = proj.rootPath || null;
   state.allFiles = proj.files;
   state.allDirs = proj.dirs || [];
@@ -1323,32 +1730,50 @@ function loadProjectState(proj) {
   const entry = pickEntryFile() || Object.keys(state.textFiles).sort()[0];
   const ri = el('runEntryInfo');
   if (ri) ri.textContent = `Входной файл: ${entry || '—'}`;
-  if (entry) openFile(entry);
-  else { renderTree(); renderTabs(); renderOutline(); }
+  const restored = opts.skipSessionRestore ? false : restoreIdeSession(state.rootPath, Boolean(opts.skipDefaultOpen));
+  if (!restored && !opts.skipDefaultOpen) {
+    if (entry) openFile(entry);
+    else { renderTree(); renderTabs(); renderOutline(); }
+  }
   compileAndRun();
   if (state.activeView === 'git') renderGitPane();
 }
 
+let lastWatcherSig = null;
+let isWatchingRefresh = false;
+
 async function refreshFromDisk() {
+  if (isWatchingRefresh) return;
+  isWatchingRefresh = true;
   try {
     const proj = await fsBridge.refreshFolder();
     if (!proj) return;
     const prevOpen = [...state.openTabs];
     const prevActive = state.activeFile;
+    const dirtyCopy = {};
+    for (const rel of state.dirty) {
+      if (state.textFiles[rel] != null) dirtyCopy[rel] = state.textFiles[rel];
+    }
     state.rootPath = proj.rootPath || state.rootPath;
     state.allFiles = proj.files;
     state.allDirs = proj.dirs || [];
-    state.textFiles = proj.textFiles;
+    state.textFiles = { ...proj.textFiles, ...dirtyCopy };
     state.assetUrls = proj.assetUrls || {};
     state.assetBase64 = proj.assetBase64 || {};
     state.openTabs = prevOpen.filter(p => state.textFiles[p] != null || state.assetUrls[p] != null);
     state.activeFile = state.openTabs.includes(prevActive) ? prevActive : (state.openTabs[0] || null);
+    const entries = await fsBridge.scanProjectEntries().catch(() => []);
+    if (entries.length) {
+      lastWatcherSig = entries.map(e => `${e.path}:${e.size}`).sort().join('|');
+    }
     renderTree();
     renderTabs();
     renderOutline();
     if (state.activeView === 'git') renderGitPane();
   } catch (err) {
     addLog(err.message || String(err), 'err');
+  } finally {
+    isWatchingRefresh = false;
   }
 }
 
@@ -1417,6 +1842,13 @@ el('ctxMenu').querySelectorAll('button').forEach(btn => {
     const parentDir = ctxTarget.isDir ? ctxTarget.rel : (ctxTarget.rel.includes('/') ? ctxTarget.rel.split('/').slice(0, -1).join('/') : '');
     if (act === 'new-file') startInlineCreate('new-file', parentDir);
     else if (act === 'new-dir') startInlineCreate('new-dir', parentDir);
+    else if (act === 'pack-atlas') {
+      try {
+        await packFolderToSpriteAtlas(parentDir, { state, RoyLang, fsBridge, refreshFromDisk, addLog, openFile });
+      } catch (err) {
+        addLog(`Ошибка упаковки атласа: ${err.message || err}`, 'err');
+      }
+    }
     else if (act === 'rename') { state.inlineEdit = { kind: 'rename', target: ctxTarget.rel }; renderTree(); }
     else if (act === 'delete') {
       if (!confirm(`Удалить "${ctxTarget.rel}"?`)) return;
@@ -1509,10 +1941,12 @@ document.querySelectorAll('.act-btn').forEach(btn => {
   btn.addEventListener('click', () => switchSideView(btn.dataset.view));
 });
 
-// Project-wide search
-el('searchFilesInput').addEventListener('input', (e) => {
-  const q = e.target.value.trim().toLowerCase();
+// Project-wide search & replace
+function runProjectSearch() {
+  const qRaw = el('searchFilesInput')?.value || '';
+  const q = qRaw.trim().toLowerCase();
   const out = el('searchResults');
+  if (!out) return;
   if (!q) {
     out.innerHTML = '<div class="muted pad-msg">Введите текст для поиска по всем файлам проекта.</div>';
     return;
@@ -1541,6 +1975,41 @@ el('searchFilesInput').addEventListener('input', (e) => {
   out.querySelectorAll('.search-hit').forEach(node => {
     node.addEventListener('click', () => openFile(node.dataset.file, Number(node.dataset.line)));
   });
+}
+
+el('searchFilesInput').addEventListener('input', runProjectSearch);
+
+el('btnReplaceAllFiles')?.addEventListener('click', () => {
+  const needle = el('searchFilesInput')?.value || '';
+  const repl = el('replaceFilesInput')?.value ?? '';
+  if (!needle) return;
+  const esc = needle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const re = new RegExp(esc, 'gi');
+  let totalCount = 0;
+  const touched = [];
+  for (const [file, text] of Object.entries(state.textFiles)) {
+    const matches = text.match(re);
+    if (matches && matches.length) {
+      totalCount += matches.length;
+      touched.push({ file, next: text.replace(re, repl) });
+    }
+  }
+  if (!totalCount) {
+    addLog(`Совпадений для "${needle}" не найдено`, 'warn');
+    return;
+  }
+  if (!confirm(`Заменить ${totalCount} вхожд. "${needle}" на "${repl}" в ${touched.length} файл.?`)) return;
+  for (const item of touched) {
+    state.textFiles[item.file] = item.next;
+    state.dirty.add(item.file);
+    if (item.file === state.activeFile && editor) editor.setValue(item.next);
+  }
+  renderTree();
+  renderTabs();
+  runProjectSearch();
+  runDiagnostics();
+  saveIdeSession();
+  addLog(`Заменено ${totalCount} вхожд. в ${touched.length} файл.`, 'info');
 });
 
 // API Reference browser
@@ -1758,13 +2227,30 @@ function showShortcutsModal() {
 
 function showAboutModal() {
   const eng = getEngineState();
-  const ver = eng.version || 'v6.5';
+  const ver = eng.version || 'v6.9';
+  const ideVer = updState.appVersion || '1.1.0';
   const modeStr = isTauriEnv() ? 'Настольное приложение (Desktop)' : 'Веб-режим (Browser)';
   showInfoModal('О программе RoyStudio Desktop', `
-    <p><strong>RoyStudio Desktop</strong> — интегрированная среда разработки для языка и игрового движка <strong>RoyLang</strong>.</p>
-    <p>Версия движка: <strong style="color:#f97316">${escapeHtml(ver)}</strong></p>
-    <p>Режим запуска: <strong>${modeStr}</strong></p>
-    <p class="muted">Поддержка .roy, .royson, .royproj, .html, .css, .js, .json и графических/аудио ассетов проекта. Экспорт в HTML, ZIP и Windows .exe.</p>
+    <p><strong>RoyStudio Desktop v${escapeHtml(ideVer)}</strong> — интегрированная среда разработки для языка и игрового движка <strong>RoyLang</strong>.</p>
+    <p>Версия движка: <strong style="color:#f97316">${escapeHtml(ver)}</strong> · Режим: <strong>${modeStr}</strong></p>
+    <p><strong>Форматы RoyLang:</strong></p>
+    <ul class="muted" style="margin:4px 0 8px 18px;line-height:1.45;">
+      <li><code>.roy</code>, <code>.roylang</code> — исходный код на RoyLang</li>
+      <li><code>.royson</code> — конфиги, данные и сейвы (v6.5)</li>
+      <li><code>.royproj</code> — манифест проекта (v6.5)</li>
+      <li><code>.royscene</code>, <code>.royprefab</code>, <code>.royanim</code> — сцены, префабы и таймлайн-анимации (v6.6)</li>
+      <li><code>.roymodel</code>, <code>.roydata</code> — обученные ИИ/ML/NanoGPT-модели (вкл. Int8) и датасеты (v6.7)</li>
+    </ul>
+    <p><strong>3D, карты, шейдеры, шрифты, медиа и скрипты:</strong></p>
+    <p class="muted" style="line-height:1.45;">
+      <code>.ttf</code>, <code>.otf</code>, <code>.woff</code>, <code>.woff2</code>, <code>.fnt</code> (шрифты с предпросмотром) ·
+      <code>.csv</code>, <code>.jsonl</code> · <code>.tmj</code>/<code>.tmx</code>/<code>.tsx</code> (Tiled), <code>.ldtk</code> ·
+      <code>.glb</code>, <code>.gltf</code>, <code>.obj</code>, <code>.mtl</code> ·
+      <code>.glsl</code>, <code>.frag</code>, <code>.vert</code>, <code>.wgsl</code>, <code>.hlsl</code>, <code>.svg</code> ·
+      <code>.mid</code>/<code>.midi</code>, <code>.webm</code>, <code>.mp4</code>, <code>.wav</code>, <code>.mp3</code>, <code>.ogg</code>, <code>.flac</code>, <code>.m4a</code>, <code>.png</code>, <code>.jpg</code>, <code>.webp</code>, <code>.avif</code> ·
+      <code>.ini</code>, <code>.cfg</code>, <code>.bat</code>, <code>.ps1</code>, <code>.sh</code>, <code>.sql</code>, <code>.lua</code>, <code>.luau</code>, <code>.py</code>, <code>.rs</code>, <code>.cs</code>, <code>.cpp</code>, <code>.h</code>, <code>.md</code>, <code>.js</code>, <code>.ts</code>, <code>.html</code>, <code>.css</code>, <code>.json</code>.<br/>
+      Экспорт: HTML, PWA, ZIP и Windows <code>.exe</code>.
+    </p>
   `);
 }
 
@@ -1926,20 +2412,172 @@ document.querySelectorAll('.menu-btn').forEach(btn => {
 window.addEventListener('click', () => closeTopMenu());
 
 // Bottom tabs & buttons
+let previewPaused = false;
+const speedSteps = [0.25, 0.5, 1, 2];
+let speedIdx = 2;
+
+function renderTelemetryToDebugPane(d) {
+  const fpsEl = el('previewFps');
+  if (fpsEl && d.fps != null) {
+    const ms = d.prof && d.prof.total != null ? ` · ${Number(d.prof.total).toFixed(1)}ms` : '';
+    fpsEl.textContent = `${Math.round(Number(d.fps) || 0)} FPS${ms}`;
+  }
+  const sel = el('dbgSceneSelect');
+  if (sel && Array.isArray(d.scenes)) {
+    const cur = d.scene || 'main';
+    const sig = d.scenes.join('|');
+    if (sel.dataset.sig !== sig) {
+      sel.dataset.sig = sig;
+      sel.innerHTML = d.scenes.map(s => `<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`).join('');
+    }
+    if (sel.value !== cur) sel.value = cur;
+  }
+  const wt = d.watchTweak || {};
+  const tweaks = Array.isArray(wt.tweaks) ? wt.tweaks : (Array.isArray(d.tweaks) ? d.tweaks : []);
+  const watches = Array.isArray(wt.watches) ? wt.watches : (Array.isArray(d.watches) ? d.watches : []);
+  const badge = el('dbgBadge');
+  if (badge) badge.textContent = String(tweaks.length + watches.length);
+
+  const tList = el('tweakList');
+  if (tList) {
+    if (!tweaks.length) {
+      if (!tList.dataset.empty) {
+        tList.dataset.empty = '1';
+        delete tList.dataset.sig;
+        tList.innerHTML = '<div class="muted">Вызови tweak("speed", 200, 50, 500) в игре</div>';
+      }
+    } else {
+      delete tList.dataset.empty;
+      const sig = tweaks.map(t => `${t.label}:${t.min}:${t.max}:${t.step}`).join('|');
+      if (tList.dataset.sig !== sig) {
+        tList.dataset.sig = sig;
+        tList.innerHTML = tweaks.map(t => `
+          <div class="tweak-row">
+            <span title="${escapeHtml(t.label)}">${escapeHtml(t.label)}</span>
+            <input type="range" min="${t.min}" max="${t.max}" step="${t.step}" value="${t.value}" data-tweak="${escapeHtml(t.label)}" />
+            <span class="tweak-val">${t.value}</span>
+          </div>
+        `).join('');
+        tList.querySelectorAll('input[data-tweak]').forEach(inp => {
+          inp.addEventListener('input', () => {
+            const val = Number(inp.value);
+            inp.nextElementSibling.textContent = String(val);
+            sendStudioCmd(el('previewFrame'), { cmd: 'setTweak', label: inp.dataset.tweak, value: val });
+          });
+        });
+      } else {
+        for (const t of tweaks) {
+          const inp = Array.from(tList.querySelectorAll('input[data-tweak]')).find(x => x.dataset.tweak === t.label);
+          if (inp && document.activeElement !== inp) {
+            inp.value = String(t.value);
+            if (inp.nextElementSibling) inp.nextElementSibling.textContent = String(t.value);
+          }
+        }
+      }
+    }
+  }
+
+  const wList = el('watchList');
+  if (wList) {
+    if (!watches.length) {
+      wList.innerHTML = '<div class="muted">Вызови watch("hp", () =&gt; player.hp) в игре</div>';
+    } else {
+      wList.innerHTML = watches.map(w => `
+        <div class="watch-row"><span class="watch-k">${escapeHtml(w.label)}</span><span class="watch-v">${escapeHtml(typeof w.value === 'object' ? JSON.stringify(w.value) : String(w.value))}</span></div>
+      `).join('');
+    }
+  }
+}
+
+function renderEntityInspector(d) {
+  const box = el('entityInspector');
+  if (!box) return;
+  const activeTag = document.activeElement;
+  if (activeTag && box.contains(activeTag) && (activeTag.tagName === 'INPUT' || activeTag.tagName === 'SELECT')) {
+    return;
+  }
+  const entities = Array.isArray(d.entities) ? d.entities : [];
+  const selected = d.selected || null;
+  if (!entities.length && !selected) {
+    box.innerHTML = '<div class="muted">Сущностей в сцене пока нет</div>';
+    return;
+  }
+  const selIdx = selected ? selected.idx : -1;
+  const optsHtml = entities.map((ent, i) => {
+    const idx = ent.idx !== undefined ? ent.idx : i;
+    const label = ent.tag || ent.name || `ent_${idx}`;
+    return `<option value="${idx}" ${idx === selIdx ? 'selected' : ''}>#${idx} ${escapeHtml(label)}</option>`;
+  }).join('');
+
+  const props = Array.isArray(selected?.props) ? selected.props : [];
+  const propsHtml = props.length
+    ? props.map(p => {
+        if (p.type === 'boolean') {
+          return `<label class="ent-prop-row"><span>${escapeHtml(p.key)}</span><input type="checkbox" data-eprop="${escapeHtml(p.key)}" ${p.val ? 'checked' : ''} /></label>`;
+        }
+        const inputType = p.type === 'number' ? 'number' : 'text';
+        return `<label class="ent-prop-row"><span>${escapeHtml(p.key)}</span><input type="${inputType}" step="any" data-eprop="${escapeHtml(p.key)}" value="${escapeHtml(String(p.val ?? ''))}" /></label>`;
+      }).join('')
+    : '<div class="muted">Кликните по объекту в игре (🎯)</div>';
+
+  box.innerHTML = `
+    <select id="entSelect" class="dbg-select">
+      <option value="-1">— Выбрать сущность (${entities.length}) —</option>
+      ${optsHtml}
+    </select>
+    ${propsHtml}
+  `;
+  el('entSelect')?.addEventListener('change', (ev) => {
+    sendStudioCmd(el('previewFrame'), { cmd: 'selectEntity', idx: Number(ev.target.value) });
+  });
+  box.querySelectorAll('[data-eprop]').forEach(inp => {
+    const evName = inp.type === 'checkbox' ? 'change' : 'input';
+    inp.addEventListener(evName, () => {
+      const value = inp.type === 'checkbox' ? inp.checked : (inp.type === 'number' ? Number(inp.value) : inp.value);
+      sendStudioCmd(el('previewFrame'), { cmd: 'setProp', key: inp.dataset.eprop, value });
+    });
+  });
+}
+
 window.addEventListener('message', (e) => {
-  if (e.data && e.data.__royLog) addLog(e.data.text, e.data.kind);
+  if (!e.data) return;
+  if (e.data.__royLog) {
+    addLog(e.data.text, e.data.kind);
+  } else if (e.data.type === 'roystudio-console') {
+    const lvl = e.data.level === 'error' ? 'err' : e.data.level === 'warn' ? 'warn' : 'info';
+    addLog(e.data.text, lvl);
+  } else if (e.data.type === 'roystudio-action' && e.data.action === 'rerun') {
+    compileAndRun();
+  } else if (e.data.type === 'roystudio-telemetry') {
+    renderTelemetryToDebugPane(e.data);
+  } else if (e.data.type === 'roystudio-inspector') {
+    renderEntityInspector(e.data);
+  } else if (e.data.type === 'roystudio-error') {
+    addCrashReport(e.data);
+  } else if (e.data.type === 'roystudio-eval-result') {
+    if (e.data.ok) addLog(`<= ${typeof e.data.value === 'string' ? e.data.value : JSON.stringify(e.data.value)}`, 'info');
+    else addLog(`<= Ошибка: ${e.data.error}`, 'err');
+  } else if (e.data.type === 'roystudio-hot-code-ack') {
+    if (e.data.ok) addLog(`Hot-Code Swap OK (сцена: ${e.data.scene}, сущностей: ${e.data.entities})`, 'info');
+    else { addLog(`Hot-Code Swap откат (${e.data.error}), полный перезапуск...`, 'warn'); compileAndRun(); }
+  } else if (e.data.type === 'roystudio-hot-ack') {
+    addLog(`Hot Reload данных: ${e.data.path}`, 'info');
+  } else if (e.data.type === 'roystudio-state-ack') {
+    addLog(`${e.data.op === 'save' ? 'Quick Save' : 'Quick Load'}: ${e.data.ok ? 'OK' : (e.data.error || 'ошибка')}`, e.data.ok ? 'info' : 'warn');
+  }
 });
 document.querySelectorAll('.btab').forEach(btn => {
   btn.addEventListener('click', () => {
     document.querySelectorAll('.btab').forEach(b => b.classList.toggle('active', b === btn));
     el('problemsPane').classList.toggle('hidden', btn.dataset.tab !== 'problems');
     el('consolePane').classList.toggle('hidden', btn.dataset.tab !== 'console');
+    el('debugPane')?.classList.toggle('hidden', btn.dataset.tab !== 'debug');
   });
 });
 el('btnClearLog').addEventListener('click', () => {
   state.logs = [];
   el('logCount').textContent = '0';
-  el('consolePane').innerHTML = '';
+  if (el('consoleLogs')) el('consoleLogs').innerHTML = '';
 });
 
 async function handleOpenFolder() {
@@ -2397,6 +3035,7 @@ window.addEventListener('keydown', (e) => {
     closeCmdPalette();
     return;
   }
+  if (e.code === 'F5' || e.key === 'F5') { e.preventDefault(); compileAndRun(); return; }
   if (e.code === 'F11') { e.preventDefault(); togglePreviewFullscreen(); return; }
   if (e.code === 'F8') { e.preventDefault(); jumpDiagnostic(e.shiftKey ? -1 : 1); return; }
   if (e.altKey && !ctrl && e.code === 'ArrowLeft') { e.preventDefault(); navTabHistory(-1); return; }
@@ -2418,11 +3057,384 @@ window.addEventListener('keydown', (e) => {
   else if (e.shiftKey && e.code === 'KeyG') { e.preventDefault(); switchSideView('git', true); }
   else if (e.shiftKey && e.code === 'KeyD') { e.preventDefault(); switchSideView('run', true); }
   else if (e.shiftKey && e.code === 'KeyM') { e.preventDefault(); toggleBottomPanel(true); document.querySelector('.btab[data-tab="problems"]').click(); }
+  else if (e.code === 'Backslash') { e.preventDefault(); toggleSplitEditor(); }
   else if (e.code === 'Backquote') { e.preventDefault(); toggleBottomPanel(); }
 });
 
+// === Preview Controls, Debug Pane, REPL, Tests, Split View, Welcome Screen ===
+let inspectModeOn = false;
+el('btnInspectMode')?.addEventListener('click', () => {
+  inspectModeOn = !inspectModeOn;
+  el('btnInspectMode').classList.toggle('is-active', inspectModeOn);
+  sendStudioCmd(el('previewFrame'), { cmd: 'inspectMode', enabled: inspectModeOn });
+  if (inspectModeOn) {
+    toggleBottomPanel(true);
+    document.querySelector('.btab[data-tab="debug"]')?.click();
+  }
+});
+
+el('previewPreset')?.addEventListener('change', (e) => {
+  const vp = el('previewViewport');
+  if (!vp) return;
+  vp.classList.remove('preset-auto', 'preset-16x9', 'preset-9x16', 'preset-4x3');
+  const map = { 'auto': 'preset-auto', '16:9': 'preset-16x9', '9:16': 'preset-9x16', '4:3': 'preset-4x3' };
+  vp.classList.add(map[e.target.value] || 'preset-auto');
+});
+
+el('btnPreviewPause')?.addEventListener('click', () => {
+  previewPaused = !previewPaused;
+  el('btnPreviewPause').classList.toggle('is-active', previewPaused);
+  el('btnPreviewPause').textContent = previewPaused ? '▶' : '⏸';
+  sendStudioCmd(el('previewFrame'), { cmd: previewPaused ? 'pause' : 'resume' });
+});
+el('btnPreviewStep')?.addEventListener('click', () => {
+  previewPaused = true;
+  el('btnPreviewPause')?.classList.add('is-active');
+  if (el('btnPreviewPause')) el('btnPreviewPause').textContent = '▶';
+  sendStudioCmd(el('previewFrame'), { cmd: 'step', frames: 1 });
+});
+el('btnPreviewSpeed')?.addEventListener('click', () => {
+  speedIdx = (speedIdx + 1) % speedSteps.length;
+  const val = speedSteps[speedIdx];
+  el('btnPreviewSpeed').textContent = `${val}x`;
+  sendStudioCmd(el('previewFrame'), { cmd: 'timeScale', value: val });
+});
+el('btnQuickSave')?.addEventListener('click', () => sendStudioCmd(el('previewFrame'), { cmd: 'saveState', slot: 'quick' }));
+el('btnQuickLoad')?.addEventListener('click', () => sendStudioCmd(el('previewFrame'), { cmd: 'loadState', slot: 'quick' }));
+el('btnScreenshot')?.addEventListener('click', async () => {
+  try {
+    const win = el('previewFrame')?.contentWindow;
+    const canvas = win?.document?.getElementById('royCanvas') || win?.document?.querySelector('canvas');
+    if (!canvas) { addLog('Canvas не найден для скриншота', 'warn'); return; }
+    const dataUrl = canvas.toDataURL('image/png');
+    const fileName = `screenshot-${Date.now()}.png`;
+    if (isTauriEnv()) {
+      const outPath = await fsBridge.pickSaveFile(fileName, 'PNG Image', 'png');
+      if (!outPath) return;
+      const b64 = dataUrl.split(',')[1];
+      await fsBridge.writeBase64Absolute(outPath, b64);
+      addLog(`Скриншот сохранён: ${outPath}`, 'info');
+    } else {
+      const a = document.createElement('a');
+      a.href = dataUrl;
+      a.download = fileName;
+      a.click();
+      addLog('Скриншот кадра сохранён', 'info');
+    }
+  } catch (err) {
+    addLog(`Ошибка скриншота: ${err.message || err}`, 'err');
+  }
+});
+
+document.querySelectorAll('input[data-dl]').forEach(chk => {
+  chk.addEventListener('change', () => {
+    const flags = {};
+    document.querySelectorAll('input[data-dl]').forEach(c => { flags[c.dataset.dl] = c.checked; });
+    sendStudioCmd(el('previewFrame'), { cmd: 'debugLayers', flags });
+    if (chk.dataset.dl === 'fps') sendStudioCmd(el('previewFrame'), { cmd: 'debugOverlay', enabled: chk.checked });
+  });
+});
+el('dbgSceneSelect')?.addEventListener('change', (e) => {
+  if (e.target.value) sendStudioCmd(el('previewFrame'), { cmd: 'gotoScene', scene: e.target.value });
+});
+
+const replHistory = [];
+let replHistIdx = 0;
+let replEvalSeq = 1;
+el('replInput')?.addEventListener('keydown', (e) => {
+  const inp = e.target;
+  if (e.key === 'Enter') {
+    const code = inp.value.trim();
+    if (!code) return;
+    replHistory.push(code);
+    replHistIdx = replHistory.length;
+    addLog(`> ${code}`, 'info');
+    sendStudioCmd(el('previewFrame'), { cmd: 'eval', id: replEvalSeq++, code });
+    inp.value = '';
+  } else if (e.key === 'ArrowUp') {
+    if (replHistIdx > 0) { replHistIdx--; inp.value = replHistory[replHistIdx] || ''; e.preventDefault(); }
+  } else if (e.key === 'ArrowDown') {
+    if (replHistIdx < replHistory.length - 1) { replHistIdx++; inp.value = replHistory[replHistIdx] || ''; }
+    else { replHistIdx = replHistory.length; inp.value = ''; }
+    e.preventDefault();
+  }
+});
+
+el('btnRunTests')?.addEventListener('click', () => {
+  const pane = el('testResultsPane');
+  const royFiles = getRoyOnlyFiles();
+  const entry = pickEntryFile();
+  if (!entry || !royFiles[entry]) {
+    if (pane) pane.innerHTML = '<div class="test-row fail">Нет .roy файла для запуска тестов</div>';
+    return;
+  }
+  try {
+    const compiled = RoyLang.compile(royFiles[entry], royFiles, entry);
+    const results = [];
+    const frame = document.createElement('iframe');
+    frame.style.display = 'none';
+    frame.sandbox = 'allow-scripts allow-same-origin';
+    document.body.appendChild(frame);
+    const logs = [];
+    const onMsg = (ev) => {
+      if (ev.source !== frame.contentWindow || !ev.data) return;
+      if (ev.data.type === 'roystudio-console') logs.push({ level: ev.data.level, text: String(ev.data.text || '') });
+    };
+    window.addEventListener('message', onMsg);
+    const html = RoyLang.compileToHtml(royFiles[entry], { title: 'RoyTestRunner' }, royFiles, entry);
+    frame.srcdoc = html;
+    setTimeout(() => {
+      window.removeEventListener('message', onMsg);
+      frame.remove();
+      for (const l of logs) {
+        const isPass = /PASS|OK|✓|успешно|passed/i.test(l.text);
+        const isFail = l.level === 'error' || /FAIL|ERROR|✗|ошибка|failed/i.test(l.text);
+        if (isPass || isFail || /test|sim|monteCarlo/i.test(l.text)) {
+          results.push({ pass: !isFail, text: l.text });
+        }
+      }
+      if (!results.length) {
+        results.push({ pass: true, text: `Компиляция и старт "${entry}" прошли без ошибок (${compiled.warnings?.length || 0} преды). Добавь test() или sim.run() для отчёта.` });
+      }
+      if (pane) {
+        pane.innerHTML = results.map(r => `<div class="test-row ${r.pass ? 'pass' : 'fail'}">${r.pass ? '✓' : '✗'} ${escapeHtml(r.text)}</div>`).join('');
+      }
+      addLog(`Тесты/симуляции (${entry}): ${results.filter(r => r.pass).length} pass, ${results.filter(r => !r.pass).length} fail`, results.some(r => !r.pass) ? 'err' : 'info');
+    }, 650);
+  } catch (err) {
+    if (pane) pane.innerHTML = `<div class="test-row fail">✗ ${escapeHtml(err.message || String(err))}</div>`;
+  }
+});
+
+let secondaryEditor = null;
+let splitFilePath = null;
+function refreshSplitFileSelect() {
+  const sel = el('splitFileSelect');
+  if (!sel) return;
+  const files = Object.keys(state.textFiles).sort();
+  sel.innerHTML = files.map(f => `<option value="${escapeHtml(f)}">${escapeHtml(f)}</option>`).join('');
+  if (!splitFilePath || state.textFiles[splitFilePath] == null) {
+    splitFilePath = files.find(f => f !== state.activeFile) || files[0] || null;
+  }
+  if (splitFilePath) sel.value = splitFilePath;
+}
+async function openSplitFile(path) {
+  splitFilePath = path;
+  if (!secondaryEditor || path == null || state.textFiles[path] == null) return;
+  secondaryEditor.setLanguage(detectMonacoLang(path));
+  secondaryEditor.setValue(state.textFiles[path]);
+}
+async function toggleSplitEditor(forceState = null) {
+  const right = el('editorRightPane');
+  const btn = el('btnToggleSplit');
+  if (!right) return;
+  const open = forceState !== null ? forceState : right.classList.contains('hidden');
+  right.classList.toggle('hidden', !open);
+  btn?.classList.toggle('active', open);
+  if (open) {
+    el('welcomeScreen')?.classList.add('hidden');
+    el('editorSplitWrap')?.classList.remove('hidden');
+    refreshSplitFileSelect();
+    if (!secondaryEditor) {
+      secondaryEditor = await createSecondaryEditor(el('editorHostRight'), {
+        onChange: (val) => {
+          if (!splitFilePath || state.textFiles[splitFilePath] == null) return;
+          state.textFiles[splitFilePath] = val;
+          state.dirty.add(splitFilePath);
+          if (splitFilePath === state.activeFile && editor) editor.setValue(val);
+          renderTree();
+          renderTabs();
+        },
+        onSave: saveAllFiles,
+        onRun: compileAndRun
+      });
+    }
+    if (splitFilePath) openSplitFile(splitFilePath);
+  }
+}
+el('btnToggleSplit')?.addEventListener('click', () => toggleSplitEditor());
+el('btnCloseSplit')?.addEventListener('click', () => toggleSplitEditor(false));
+el('splitFileSelect')?.addEventListener('change', (e) => openSplitFile(e.target.value));
+
+async function createProjectFromTemplate(tpl) {
+  let targetDir = null;
+  if (isTauriEnv()) {
+    targetDir = await fsBridge.pickDirectory(`Выберите папку для проекта "${tpl.title}"`).catch(() => null);
+  }
+  el('welcomeScreen')?.classList.add('hidden');
+  el('editorSplitWrap')?.classList.remove('hidden');
+
+  if (targetDir) {
+    try { localStorage.removeItem(getSessionKey(targetDir)); } catch {}
+    await fsBridge.openFolderPath(targetDir);
+    for (const [rel, txt] of Object.entries(tpl.files)) {
+      await fsBridge.writeFile(rel, txt);
+    }
+    const proj = await fsBridge.openFolderPath(targetDir);
+    if (proj) {
+      loadProjectState(proj, { skipSessionRestore: true, skipDefaultOpen: true });
+      openFile(state.textFiles['main.roy'] != null ? 'main.roy' : Object.keys(state.textFiles)[0]);
+      compileAndRun();
+      addLog(`Создан проект по шаблону "${tpl.title}"`, 'info');
+      return;
+    }
+  }
+  try { localStorage.removeItem(getSessionKey(null)); } catch {}
+  const files = Object.keys(tpl.files).sort();
+  loadProjectState({
+    name: tpl.title.replace(/^[^\s]+\s*/, ''),
+    rootPath: null,
+    files,
+    dirs: [],
+    textFiles: { ...tpl.files },
+    assetUrls: {},
+    assetBase64: {}
+  }, { skipSessionRestore: true, skipDefaultOpen: true });
+  openFile(state.textFiles['main.roy'] != null ? 'main.roy' : files[0]);
+  compileAndRun();
+  addLog(`Открыт шаблон "${tpl.title}"`, 'info');
+}
+
+function showWelcomeScreen() {
+  const ws = el('welcomeScreen');
+  if (!ws) return;
+  el('imageViewer')?.classList.add('hidden');
+  el('editorSplitWrap')?.classList.add('hidden');
+  ws.classList.remove('hidden');
+
+  const recent = readRecent();
+  ws.innerHTML = `
+    <div class="welcome-hero">
+      <h2>◆ RoyStudio Desktop · RoyLang ${escapeHtml(RoyLang.VERSION || 'v6.9')}</h2>
+      <p>Выберите готовый шаблон, откройте папку проекта (или перетащите её прямо в окно) либо продолжите недавний проект.</p>
+    </div>
+    <div class="welcome-grid">
+      ${PROJECT_TEMPLATES.map(t => `
+        <button class="tpl-card" data-tpl="${t.id}">
+          <strong>${escapeHtml(t.title)}</strong>
+          <span>${escapeHtml(t.desc)}</span>
+        </button>
+      `).join('')}
+    </div>
+    <div class="welcome-actions">
+      <button id="wsOpenFolder" class="primary">📂 Открыть папку проекта</button>
+      <button id="wsBackToEditor">📝 Вернуться в редактор</button>
+    </div>
+    <div class="welcome-recent">
+      <h3>Недавние проекты</h3>
+      <div class="welcome-recent-list">
+        ${recent.length ? recent.slice(0, 8).map((r, i) => `
+          <button class="welcome-recent-item" data-ridx="${i}">
+            <span>📁 ${escapeHtml(r.name || r.rootPath)}</span>
+            <span class="muted">${escapeHtml(r.rootPath || '')}</span>
+          </button>
+        `).join('') : '<div class="muted">Недавних проектов пока нет.</div>'}
+      </div>
+    </div>
+  `;
+  ws.querySelectorAll('.tpl-card').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const tpl = PROJECT_TEMPLATES.find(t => t.id === btn.dataset.tpl);
+      if (tpl) createProjectFromTemplate(tpl);
+    });
+  });
+  el('wsOpenFolder')?.addEventListener('click', handleOpenFolder);
+  el('wsBackToEditor')?.addEventListener('click', () => {
+    ws.classList.add('hidden');
+    el('editorSplitWrap')?.classList.remove('hidden');
+  });
+  ws.querySelectorAll('.welcome-recent-item').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const r = recent[Number(btn.dataset.ridx)];
+      if (r && r.rootPath) {
+        const proj = await fsBridge.openFolderPath(r.rootPath).catch(() => null);
+        if (proj) loadProjectState(proj);
+      }
+    });
+  });
+}
+el('btnWelcomeTab')?.addEventListener('click', showWelcomeScreen);
+
+async function openLaunchFilePath(launchFile) {
+  if (!launchFile) return false;
+  try {
+    const ext = getExt(launchFile);
+    const projectRoot = await fsBridge.getParentDir(launchFile);
+    let proj = await fsBridge.openFolderPath(projectRoot).catch(() => null);
+    const baseName = launchFile.split(/[\\/]/).pop();
+    let rel = projectRoot
+      ? launchFile.slice(projectRoot.length).replace(/^[\\/]+/, '').replace(/\\/g, '/')
+      : baseName;
+    if (!rel || rel === launchFile.replace(/\\/g, '/')) rel = baseName;
+
+    if (!proj) {
+      const extFile = await fsBridge.openExternalFile(launchFile).catch(() => null);
+      if (extFile && extFile.text != null) {
+        proj = {
+          name: baseName,
+          rootPath: projectRoot || null,
+          files: [baseName],
+          dirs: [],
+          textFiles: { [baseName]: extFile.text },
+          assetUrls: {},
+          assetBase64: {}
+        };
+        rel = baseName;
+      }
+    }
+
+    if (proj) {
+      loadProjectState(proj, { skipDefaultOpen: true });
+      let targetKey = Object.keys(state.textFiles).find(k => k.toLowerCase() === rel.toLowerCase())
+        || Object.keys(state.textFiles).find(k => k.split('/').pop().toLowerCase() === baseName.toLowerCase());
+      if (!targetKey) {
+        const extFile = await fsBridge.openExternalFile(launchFile).catch(() => null);
+        if (extFile && extFile.text != null) {
+          state.textFiles[baseName] = extFile.text;
+          if (!state.allFiles.includes(baseName)) state.allFiles.push(baseName);
+          targetKey = baseName;
+        }
+      }
+      if (targetKey) {
+        openFile(targetKey);
+        compileAndRun();
+      } else if (state.assetUrls[rel] != null) {
+        openFile(rel);
+      } else {
+        addLog(`Файл выбран в Проводнике, но не загружен: .${ext}`, 'warn');
+      }
+      return true;
+    }
+  } catch (err) {
+    addLog(`Не удалось открыть файл из Проводника: ${err.message || err}`, 'err');
+  }
+  return false;
+}
+
+function startProjectFileWatcher() {
+  const checkChanges = async () => {
+    if (!isTauriEnv() || !state.rootPath || isWatchingRefresh) return;
+    try {
+      const entries = await fsBridge.scanProjectEntries();
+      const sig = entries.map(e => `${e.path}:${e.size}`).sort().join('|');
+      if (lastWatcherSig === null) {
+        lastWatcherSig = sig;
+        return;
+      }
+      if (sig !== lastWatcherSig) {
+        lastWatcherSig = sig;
+        await refreshFromDisk();
+        addLog('Дерево файлов обновлено с диска', 'info');
+      }
+    } catch {}
+  };
+  setInterval(checkChanges, 3500);
+  window.addEventListener('focus', checkChanges);
+}
+
 async function boot() {
-  updState.appVersion = await fsBridge.getAppVersion().catch(() => '1.0.0');
+  updState.appVersion = await fsBridge.getAppVersion().catch(() => '1.1.0');
+  fsBridge.onTauriEvent('open-launch-file', (p) => { if (p) openLaunchFilePath(p); });
   fsBridge.onTauriEvent('engine-download-progress', (p) => {
     if (!p) return;
     const pct = p.total ? Math.round((p.downloaded / p.total) * 100) : 50;
@@ -2464,7 +3476,7 @@ async function boot() {
       renderTree();
       renderTabs();
       clearTimeout(diagTimer);
-      diagTimer = setTimeout(() => { renderOutline(); runDiagnostics(); }, 320);
+      diagTimer = setTimeout(() => { renderOutline(); runDiagnostics(); saveIdeSession(); }, 320);
       if (state.autoSave) {
         clearTimeout(autoSaveTimer);
         autoSaveTimer = setTimeout(() => saveActiveFile(), 1200);
@@ -2478,24 +3490,11 @@ async function boot() {
 
   installDropHandlers();
   const launchFile = await fsBridge.getLaunchFile().catch(() => null);
-  if (launchFile) {
-    try {
-      const ext = getExt(launchFile);
-      const projectRoot = await fsBridge.getParentDir(launchFile);
-      const proj = await fsBridge.openFolderPath(projectRoot);
-      if (proj) {
-        loadProjectState(proj);
-        const rel = launchFile.slice(projectRoot.length).replace(/^[\\/]+/, '').replace(/\\/g, '/');
-        if (state.textFiles[rel] != null || state.assetUrls[rel] != null) openFile(rel);
-        else addLog(`Файл выбран в Проводнике, но не загружен: .${ext}`, 'warn');
-      }
-    } catch (err) {
-      addLog(`Не удалось открыть файл из Проводника: ${err.message || err}`, 'err');
-      loadProjectState(await fsBridge.openDemo());
-    }
-  } else {
+  const openedLaunch = launchFile ? await openLaunchFilePath(launchFile) : false;
+  if (!openedLaunch) {
     loadProjectState(await fsBridge.openDemo());
   }
+  startProjectFileWatcher();
   setTimeout(() => refreshAllUpdates(true), 3000);
 }
 

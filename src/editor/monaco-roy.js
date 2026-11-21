@@ -1,14 +1,36 @@
 import { getEngineState } from '../core/engine-manager.js';
 
-const MONACO_BASE = 'https://cdn.jsdelivr.net/npm/monaco-editor@0.52.2/min/vs';
+const MONACO_BASE = './vendor/monaco/vs';
 
 let monacoInstance = null;
 let liveMeta = {
-  version: 'v6.5',
+  version: 'v6.9',
   keywords: [],
   apis: [],
   docsByName: new Map()
 };
+
+let liveAnalysis = {
+  symbols: [],
+  byName: new Map(),
+  getActiveFile: () => null,
+  onOpenFile: null
+};
+
+export function updateRoyAnalysis(symbols, helpers = null) {
+  const list = Array.isArray(symbols) ? symbols : [];
+  const byName = new Map();
+  for (const s of list) {
+    if (!s || !s.name) continue;
+    if (!byName.has(s.name)) byName.set(s.name, s);
+  }
+  liveAnalysis.symbols = list;
+  liveAnalysis.byName = byName;
+  if (helpers) {
+    if (typeof helpers.getActiveFile === 'function') liveAnalysis.getActiveFile = helpers.getActiveFile;
+    if (typeof helpers.onOpenFile === 'function') liveAnalysis.onOpenFile = helpers.onOpenFile;
+  }
+}
 
 function syncMetaFromEngine(meta) {
   const src = meta || getEngineState();
@@ -109,6 +131,86 @@ function applyRoyMonarchTokens(monaco) {
   });
 }
 
+function registerColorProviderForLang(monaco, langId) {
+  monaco.languages.registerColorProvider(langId, {
+    provideDocumentColors(model) {
+      const text = model.getValue();
+      const colors = [];
+      const hexRe = /#(?:[0-9a-fA-F]{8}|[0-9a-fA-F]{6}|[0-9a-fA-F]{3})\b/g;
+      let m;
+      while ((m = hexRe.exec(text)) !== null) {
+        const hex = m[0].slice(1);
+        let r = 0, g = 0, b = 0, a = 1;
+        if (hex.length === 3) {
+          r = parseInt(hex[0] + hex[0], 16) / 255;
+          g = parseInt(hex[1] + hex[1], 16) / 255;
+          b = parseInt(hex[2] + hex[2], 16) / 255;
+        } else {
+          r = parseInt(hex.slice(0, 2), 16) / 255;
+          g = parseInt(hex.slice(2, 4), 16) / 255;
+          b = parseInt(hex.slice(4, 6), 16) / 255;
+          if (hex.length === 8) a = parseInt(hex.slice(6, 8), 16) / 255;
+        }
+        const start = model.getPositionAt(m.index);
+        const end = model.getPositionAt(m.index + m[0].length);
+        colors.push({
+          color: { red: r, green: g, blue: b, alpha: a },
+          range: new monaco.Range(start.lineNumber, start.column, end.lineNumber, end.column)
+        });
+      }
+      return colors;
+    },
+    provideColorPresentations(model, colorInfo) {
+      const { red, green, blue, alpha } = colorInfo.color;
+      const toHex = (v) => Math.round(Math.max(0, Math.min(1, v)) * 255).toString(16).padStart(2, '0');
+      const hex = alpha < 0.999
+        ? `#${toHex(red)}${toHex(green)}${toHex(blue)}${toHex(alpha)}`
+        : `#${toHex(red)}${toHex(green)}${toHex(blue)}`;
+      return [{ label: hex }];
+    }
+  });
+}
+
+function formatSymbolSig(sym) {
+  if (!sym) return '';
+  if (Array.isArray(sym.params)) return `${sym.kind || 'fn'} ${sym.name}(${sym.params.join(', ')})`;
+  return `${sym.kind || 'symbol'} ${sym.name}`;
+}
+
+function parseCallBeforeCursor(lineText, colOneBased) {
+  const before = lineText.slice(0, Math.max(0, colOneBased - 1));
+  let depth = 0;
+  let commas = 0;
+  let openIdx = -1;
+  let inStr = null;
+  for (let i = before.length - 1; i >= 0; i--) {
+    const ch = before[i];
+    if (inStr) {
+      if (ch === inStr && before[i - 1] !== '\\') inStr = null;
+      continue;
+    }
+    if (ch === '"' || ch === "'") { inStr = ch; continue; }
+    if (ch === ')') { depth++; continue; }
+    if (ch === '(') {
+      if (depth === 0) { openIdx = i; break; }
+      depth--;
+      continue;
+    }
+    if (ch === ',' && depth === 0) commas++;
+  }
+  if (openIdx < 0) return null;
+  const left = before.slice(0, openIdx).trimEnd();
+  const m = /([a-zA-Z_$][\w$]*)$/.exec(left);
+  if (!m) return null;
+  return { name: m[1], activeParameter: commas };
+}
+
+function splitSigParams(sig) {
+  const m = /\(([^)]*)\)/.exec(sig || '');
+  if (!m || !m[1].trim()) return [];
+  return m[1].split(',').map(p => p.trim()).filter(Boolean);
+}
+
 function registerRoyLanguage(monaco) {
   monacoInstance = monaco;
   registerRoysonLanguages(monaco);
@@ -118,6 +220,21 @@ function registerRoyLanguage(monaco) {
   }
   monaco.languages.register({ id: 'roy', extensions: ['.roy', '.roylang'] });
   applyRoyMonarchTokens(monaco);
+  registerColorProviderForLang(monaco, 'roy');
+  registerColorProviderForLang(monaco, 'royson');
+  registerColorProviderForLang(monaco, 'royproj');
+
+  monaco.editor.registerEditorOpener({
+    openCodeEditor(_source, resource, selectionOrPosition) {
+      if (resource && resource.scheme === 'roy' && typeof liveAnalysis.onOpenFile === 'function') {
+        const rel = resource.path.replace(/^\/+/, '');
+        const ln = selectionOrPosition?.startLineNumber || selectionOrPosition?.lineNumber || 1;
+        liveAnalysis.onOpenFile(rel, ln);
+        return true;
+      }
+      return false;
+    }
+  });
 
   monaco.languages.registerCompletionItemProvider('roy', {
     provideCompletionItems: (model, position) => {
@@ -128,7 +245,28 @@ function registerRoyLanguage(monaco) {
         startColumn: word.startColumn,
         endColumn: word.endColumn
       };
+      const seenUser = new Set();
+      const userItems = [];
+      for (const sym of liveAnalysis.symbols) {
+        if (!sym || !sym.name || seenUser.has(sym.name)) continue;
+        seenUser.add(sym.name);
+        const kind =
+          sym.kind === 'fn' ? monaco.languages.CompletionItemKind.Function :
+          sym.kind === 'struct' || sym.kind === 'class' ? monaco.languages.CompletionItemKind.Struct :
+          sym.kind === 'entity' ? monaco.languages.CompletionItemKind.Class :
+          sym.kind === 'field' ? monaco.languages.CompletionItemKind.Field :
+          monaco.languages.CompletionItemKind.Variable;
+        userItems.push({
+          label: sym.name,
+          kind,
+          insertText: sym.name,
+          detail: `${formatSymbolSig(sym)}${sym.file ? ` · ${sym.file}:${sym.line || 1}` : ''}`,
+          documentation: sym.doc || undefined,
+          range
+        });
+      }
       const items = [
+        ...userItems,
         ...liveMeta.keywords.map(k => ({
           label: k,
           kind: monaco.languages.CompletionItemKind.Keyword,
@@ -173,14 +311,108 @@ function registerRoyLanguage(monaco) {
       const w = model.getWordAtPosition(position);
       if (!w) return null;
       const doc = liveMeta.docsByName.get(w.word);
-      if (!doc) return null;
+      if (doc) {
+        return {
+          range: new monaco.Range(position.lineNumber, w.startColumn, position.lineNumber, w.endColumn),
+          contents: [
+            { value: '```roy\n' + doc.sig + '\n```' },
+            { value: `**${doc.kind || 'API'}** · \`${doc.cat || 'core'}\` (${doc.ver || liveMeta.version})\n\n${doc.desc || ''}` }
+          ]
+        };
+      }
+      const sym = liveAnalysis.byName.get(w.word);
+      if (sym) {
+        return {
+          range: new monaco.Range(position.lineNumber, w.startColumn, position.lineNumber, w.endColumn),
+          contents: [
+            { value: '```roy\n' + formatSymbolSig(sym) + '\n```' },
+            { value: `${sym.file ? `\`${sym.file}:${sym.line || 1}\`` : 'Проект'}${sym.doc ? `\n\n${sym.doc}` : ''}` }
+          ]
+        };
+      }
+      return null;
+    }
+  });
+
+  monaco.languages.registerSignatureHelpProvider('roy', {
+    signatureHelpTriggerCharacters: ['(', ','],
+    provideSignatureHelp: (model, position) => {
+      const lineText = model.getLineContent(position.lineNumber);
+      const call = parseCallBeforeCursor(lineText, position.column);
+      if (!call) return null;
+      const doc = liveMeta.docsByName.get(call.name);
+      const sym = liveAnalysis.byName.get(call.name);
+      let label = null;
+      let documentation = '';
+      let params = [];
+      if (doc && doc.sig) {
+        label = doc.sig;
+        documentation = doc.desc || '';
+        params = splitSigParams(doc.sig);
+      } else if (sym && Array.isArray(sym.params)) {
+        label = `${sym.name}(${sym.params.join(', ')})`;
+        documentation = sym.doc || (sym.file ? `${sym.file}:${sym.line || 1}` : '');
+        params = sym.params;
+      }
+      if (!label) return null;
       return {
-        range: new monaco.Range(position.lineNumber, w.startColumn, position.lineNumber, w.endColumn),
-        contents: [
-          { value: '```roy\n' + doc.sig + '\n```' },
-          { value: `**${doc.kind || 'API'}** · \`${doc.cat || 'core'}\` (${doc.ver || liveMeta.version})\n\n${doc.desc || ''}` }
-        ]
+        value: {
+          signatures: [{
+            label,
+            documentation,
+            parameters: params.map(p => ({ label: p }))
+          }],
+          activeSignature: 0,
+          activeParameter: Math.min(call.activeParameter, Math.max(0, params.length - 1))
+        },
+        dispose: () => {}
       };
+    }
+  });
+
+  monaco.languages.registerDefinitionProvider('roy', {
+    provideDefinition: (model, position) => {
+      const w = model.getWordAtPosition(position);
+      if (!w) return null;
+      const sym = liveAnalysis.byName.get(w.word);
+      if (!sym || !sym.line) return null;
+      const activeFile = liveAnalysis.getActiveFile();
+      const targetUri = (!sym.file || sym.file === activeFile)
+        ? model.uri
+        : monaco.Uri.parse(`roy:///${sym.file.replace(/^\/+/, '')}`);
+      const ln = Math.max(1, sym.line || 1);
+      const col = Math.max(1, sym.col || 1);
+      return {
+        uri: targetUri,
+        range: new monaco.Range(ln, col, ln, col + w.word.length)
+      };
+    }
+  });
+
+  monaco.languages.registerRenameProvider('roy', {
+    provideRenameEdits: (model, position, newName) => {
+      const w = model.getWordAtPosition(position);
+      if (!w || !newName || !/^[a-zA-Z_$][\w$]*$/.test(newName)) return null;
+      const matches = model.findMatches(w.word, true, false, true, null, false);
+      return {
+        edits: matches.map(m => ({
+          resource: model.uri,
+          textEdit: { range: m.range, text: newName }
+        }))
+      };
+    }
+  });
+
+  monaco.languages.registerDocumentFormattingEditProvider('roy', {
+    provideDocumentFormattingEdits: (model) => {
+      if (typeof window === 'undefined' || !window.RoyLang || typeof window.RoyLang.format !== 'function') return [];
+      const src = model.getValue();
+      const formatted = window.RoyLang.format(src);
+      if (typeof formatted !== 'string' || formatted === src) return [];
+      return [{
+        range: model.getFullModelRange(),
+        text: formatted
+      }];
     }
   });
 }
@@ -188,16 +420,26 @@ function registerRoyLanguage(monaco) {
 export function detectMonacoLang(path) {
   const ext = (path || '').split('.').pop().toLowerCase();
   if (ext === 'roy' || ext === 'roylang') return 'roy';
-  if (ext === 'royson') return 'royson';
+  if (ext === 'royson' || ext === 'royscene' || ext === 'royprefab' || ext === 'royanim' || ext === 'roydata' || ext === 'roymodel') return 'royson';
   if (ext === 'royproj') return 'royproj';
+  if (ext === 'json' || ext === 'jsonl' || ext === 'tmj' || ext === 'ldtk' || ext === 'gltf') return 'json';
+  if (ext === 'lua' || ext === 'luau') return 'lua';
+  if (ext === 'py') return 'python';
+  if (ext === 'glsl' || ext === 'frag' || ext === 'vert' || ext === 'wgsl' || ext === 'hlsl' || ext === 'cpp' || ext === 'c' || ext === 'h' || ext === 'hpp') return 'cpp';
   if (ext === 'html' || ext === 'htm') return 'html';
   if (ext === 'css') return 'css';
   if (ext === 'js' || ext === 'mjs' || ext === 'cjs') return 'javascript';
   if (ext === 'ts' || ext === 'tsx') return 'typescript';
-  if (ext === 'json') return 'json';
   if (ext === 'md') return 'markdown';
-  if (ext === 'xml' || ext === 'svg') return 'xml';
+  if (ext === 'tmx' || ext === 'xml' || ext === 'svg') return 'xml';
   if (ext === 'yaml' || ext === 'yml') return 'yaml';
+  if (ext === 'ini' || ext === 'cfg') return 'ini';
+  if (ext === 'bat') return 'bat';
+  if (ext === 'ps1') return 'powershell';
+  if (ext === 'sh') return 'shell';
+  if (ext === 'sql') return 'sql';
+  if (ext === 'rs') return 'rust';
+  if (ext === 'cs') return 'csharp';
   return 'plaintext';
 }
 
@@ -220,7 +462,8 @@ export async function createRoyEditor(hostEl, { onChange, onSave, onRun, onCurso
       wordWrap: 'off',
       scrollBeyondLastLine: false,
       smoothScrolling: true,
-      cursorBlinking: 'smooth'
+      cursorBlinking: 'smooth',
+      colorDecorators: true
     });
 
     editor.onDidChangeModelContent(() => onChange(editor.getValue()));
@@ -245,6 +488,13 @@ export async function createRoyEditor(hostEl, { onChange, onSave, onRun, onCurso
         }
       },
       revealLine: (line) => { editor.revealLineInCenter(line); editor.setPosition({ lineNumber: line, column: 1 }); editor.focus(); },
+      getPosition: () => { const p = editor.getPosition(); return p ? { line: p.lineNumber, col: p.column } : { line: 1, col: 1 }; },
+      setPosition: (line, col = 1) => {
+        const ln = Math.max(1, Number(line) || 1);
+        const c = Math.max(1, Number(col) || 1);
+        editor.setPosition({ lineNumber: ln, column: c });
+        editor.revealLineInCenter(ln);
+      },
       insertText: (txt) => {
         const sel = editor.getSelection();
         if (!sel) return;
@@ -342,6 +592,8 @@ export async function createRoyEditor(hostEl, { onChange, onSave, onRun, onCurso
       setValue: (text) => { ta.value = text; },
       setLanguage: () => {},
       revealLine: () => ta.focus(),
+      getPosition: () => ({ line: 1, col: 1 }),
+      setPosition: () => {},
       insertText: (txt) => {
         const s = ta.selectionStart || 0;
         ta.value = ta.value.slice(0, s) + txt + ta.value.slice(ta.selectionEnd || s);
@@ -376,6 +628,54 @@ export async function createRoyEditor(hostEl, { onChange, onSave, onRun, onCurso
       },
       getOptionsState: () => ({ wordWrap: wordWrapOn, minimap: minimapOn, fontSize }),
       setMarkers: () => {}
+    };
+  }
+}
+
+export async function createSecondaryEditor(hostEl, { onChange, onSave, onRun }) {
+  try {
+    const monaco = await loadMonacoScript();
+    registerRoyLanguage(monaco);
+    const ed = monaco.editor.create(hostEl, {
+      value: '',
+      language: 'roy',
+      theme: 'vs-dark',
+      automaticLayout: true,
+      fontSize: 13,
+      tabSize: 2,
+      minimap: { enabled: false },
+      wordWrap: 'off',
+      scrollBeyondLastLine: false,
+      smoothScrolling: true,
+      colorDecorators: true
+    });
+    ed.onDidChangeModelContent(() => { if (onChange) onChange(ed.getValue()); });
+    if (onSave) ed.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => onSave());
+    if (onRun) ed.addCommand(monaco.KeyCode.F5, () => onRun());
+    return {
+      isMonaco: true,
+      focus: () => ed.focus(),
+      getValue: () => ed.getValue(),
+      setValue: (text) => { if (ed.getValue() !== text) ed.setValue(text); },
+      setLanguage: (langId) => {
+        const model = ed.getModel();
+        if (model && model.getLanguageId() !== langId) monaco.editor.setModelLanguage(model, langId);
+      },
+      dispose: () => ed.dispose()
+    };
+  } catch {
+    const ta = document.createElement('textarea');
+    ta.className = 'fallback-editor';
+    ta.spellcheck = false;
+    hostEl.appendChild(ta);
+    ta.addEventListener('input', () => { if (onChange) onChange(ta.value); });
+    return {
+      isMonaco: false,
+      focus: () => ta.focus(),
+      getValue: () => ta.value,
+      setValue: (text) => { ta.value = text; },
+      setLanguage: () => {},
+      dispose: () => ta.remove()
     };
   }
 }

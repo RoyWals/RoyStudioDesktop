@@ -32,7 +32,7 @@
         </button>
       </div>
       <div class="tb-actions">
-        <button class="ver-badge" id="engineVer" title="Версия движка RoyLang — нажмите для обновления или переключения">v6.5</button>
+        <button class="ver-badge" id="engineVer" title="Версия движка RoyLang — нажмите для обновления или переключения">v6.9</button>
         <button id="btnRun" class="primary compact-btn" title="Собрать и запустить игру (F5)">▶ F5</button>
         <button id="btnBuildModal" class="compact-btn" title="Сборка и экспорт: HTML / ZIP / EXE (Ctrl+Shift+B)">📦 Сборка</button>
         <button id="btnToggleSidebar" class="icon-btn active" title="Боковая панель (Ctrl+B)">
@@ -100,9 +100,13 @@
 
         <!-- Search View -->
         <div class="side-view hidden" id="view-search">
-          <div class="side-head"><span>ПОИСК ПО ФАЙЛАМ</span></div>
+          <div class="side-head"><span>ПОИСК И ЗАМЕНА</span></div>
           <div class="side-input-wrap">
             <input id="searchFilesInput" type="search" placeholder="Найти в .roy файлах..." />
+          </div>
+          <div class="side-input-wrap replace-row">
+            <input id="replaceFilesInput" type="text" placeholder="Заменить на..." />
+            <button id="btnReplaceAllFiles" title="Заменить во всех файлах проекта">Все</button>
           </div>
           <div id="searchResults" class="search-results">
             <div class="muted pad-msg">Введите текст для поиска по всем .roy файлам проекта.</div>
@@ -123,9 +127,11 @@
           <div class="side-head"><span>RUN AND DEBUG</span></div>
           <div class="run-pane">
             <button id="btnRunPanelStart" class="primary full-btn">▶ Run and Debug (F5)</button>
+            <button id="btnRunTests" class="full-btn">🧪 Запустить тесты / симуляции</button>
             <button id="btnRunPanelFullscreen" class="full-btn">⛶ Превью на весь экран (F11)</button>
             <button id="btnRunPanelExport" class="full-btn">📦 Сборка проекта (HTML / ZIP / EXE)</button>
             <div class="muted pad-msg" id="runEntryInfo">Входной файл: main.roy</div>
+            <div id="testResultsPane" class="test-results-pane"></div>
           </div>
         </div>
 
@@ -148,11 +154,28 @@
       <section class="editor-area">
         <div class="tabs-bar" id="tabsBar"></div>
         <div class="breadcrumbs" id="breadcrumbs">
-          <span class="bc-proj">RoyStudio</span>
-          <span class="bc-sep">›</span>
-          <span class="bc-file" id="bcFile">main.roy</span>
+          <div class="bc-left">
+            <span class="bc-proj">RoyStudio</span>
+            <span class="bc-sep">›</span>
+            <span class="bc-file" id="bcFile">main.roy</span>
+          </div>
+          <div class="bc-actions">
+            <label class="chk-mini" title="Мягкая подмена кода и данных без перезапуска сцены"><input id="chkHotSwap" type="checkbox" checked /> Hot-Swap</label>
+            <button id="btnToggleSplit" class="bc-btn" title="Разделить редактор (Ctrl+\)">◫ Split</button>
+            <button id="btnWelcomeTab" class="bc-btn" title="Стартовый экран и шаблоны">🏠 Старт</button>
+          </div>
         </div>
-        <div id="editorHost" class="editor-host"></div>
+        <div id="welcomeScreen" class="welcome-screen hidden"></div>
+        <div id="editorSplitWrap" class="editor-split-wrap">
+          <div id="editorHost" class="editor-host"></div>
+          <div id="editorRightPane" class="editor-right-pane hidden">
+            <div class="split-head">
+              <select id="splitFileSelect" title="Файл для правой панели"></select>
+              <button id="btnCloseSplit" title="Закрыть правую панель">✕</button>
+            </div>
+            <div id="editorHostRight" class="editor-host-right"></div>
+          </div>
+        </div>
         <div id="imageViewer" class="image-viewer hidden">
           <div class="iv-toolbar"><div class="iv-meta" id="ivMeta"></div><div class="iv-controls" id="ivControls"></div></div>
           <div class="iv-stage" id="ivStage"><img id="ivImg" alt="Preview" /></div>
@@ -164,10 +187,44 @@
           <div class="bottom-tabs">
             <button class="btab active" data-tab="problems">ПРОБЛЕМЫ <span id="probCount" class="count">0</span></button>
             <button class="btab" data-tab="console">КОНСОЛЬ ИГРЫ <span id="logCount" class="count">0</span></button>
+            <button class="btab" data-tab="debug">ОТЛАДКА / TWEAK <span id="dbgBadge" class="count">0</span></button>
             <button id="btnClearLog" class="clear-btn">Очистить</button>
           </div>
           <div id="problemsPane" class="bottom-body"></div>
-          <div id="consolePane" class="bottom-body hidden"></div>
+          <div id="consolePane" class="bottom-body console-wrap hidden">
+            <div id="consoleLogs" class="console-logs"></div>
+            <div class="repl-bar">
+              <span class="repl-prompt">&gt;</span>
+              <input id="replInput" type="text" placeholder="Выражение в живой рантайм (например: player.x, score += 100)..." autocomplete="off" />
+            </div>
+          </div>
+          <div id="debugPane" class="bottom-body debug-pane hidden">
+            <div class="dbg-toolbar">
+              <span class="dbg-lbl">Слои:</span>
+              <label class="chk-mini"><input type="checkbox" data-dl="hitboxes" /> Хитбоксы</label>
+              <label class="chk-mini"><input type="checkbox" data-dl="grid" /> Сетка</label>
+              <label class="chk-mini"><input type="checkbox" data-dl="ai" /> ИИ-векторы</label>
+              <label class="chk-mini"><input type="checkbox" data-dl="paths" /> Пути</label>
+              <label class="chk-mini"><input type="checkbox" data-dl="fps" /> Debug Overlay</label>
+              <span class="dbg-sep"></span>
+              <span class="dbg-lbl">Сцена:</span>
+              <select id="dbgSceneSelect" class="dbg-select"></select>
+            </div>
+            <div class="dbg-cols">
+              <div class="dbg-col">
+                <div class="dbg-col-title">TWEAK (ПОЛЗУНКИ)</div>
+                <div id="tweakList" class="dbg-list"><div class="muted">Вызови tweak("speed", 200, 50, 500) в игре</div></div>
+              </div>
+              <div class="dbg-col">
+                <div class="dbg-col-title">WATCH (НАБЛЮДЕНИЕ)</div>
+                <div id="watchList" class="dbg-list"><div class="muted">Вызови watch("hp", () =&gt; player.hp) в игре</div></div>
+              </div>
+              <div class="dbg-col">
+                <div class="dbg-col-title">ИНСПЕКТОР СУЩНОСТЕЙ</div>
+                <div id="entityInspector" class="dbg-list"><div class="muted">Включите 🎯 в превью и кликните по объекту</div></div>
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -183,7 +240,30 @@
             <button id="btnFullscreenPreview" title="Полный экран превью (F11 / Esc)">⛶</button>
           </div>
         </div>
-        <iframe id="previewFrame" sandbox="allow-scripts allow-same-origin allow-pointer-lock" allowfullscreen></iframe>
+        <div class="preview-toolbar">
+          <div class="preview-left-tools">
+            <span class="fps-badge" id="previewFps" title="FPS и время кадра">-- FPS</span>
+            <select id="previewPreset" class="preview-preset" title="Соотношение сторон превью">
+              <option value="auto">Авто</option>
+              <option value="16:9">16:9</option>
+              <option value="9:16">9:16 (Моб)</option>
+              <option value="4:3">4:3</option>
+            </select>
+          </div>
+          <div class="preview-tools">
+            <button id="btnInspectMode" title="Пипетка сущностей: кликните по объекту в игре">🎯</button>
+            <button id="btnPreviewPause" title="Пауза / Продолжить">⏸</button>
+            <button id="btnPreviewStep" title="Шаг +1 кадр (stepFrame)">⏭</button>
+            <button id="btnPreviewSpeed" class="speed-btn" title="Скорость времени (0.25x / 0.5x / 1x / 2x)">1x</button>
+            <span class="pt-sep"></span>
+            <button id="btnQuickSave" title="Быстрое сохранение состояния (saveState)">💾</button>
+            <button id="btnQuickLoad" title="Быстрая загрузка состояния (loadState)">📂</button>
+            <button id="btnScreenshot" title="Скриншот кадра">📷</button>
+          </div>
+        </div>
+        <div id="previewViewport" class="preview-viewport preset-auto">
+          <iframe id="previewFrame" sandbox="allow-scripts allow-same-origin allow-pointer-lock" allowfullscreen></iframe>
+        </div>
       </section>
     </div>
 
@@ -201,7 +281,7 @@
         <span class="sb-item" id="sbCursor">Стр 1, Стб 1</span>
         <span class="sb-item">Отступ: 2</span>
         <span class="sb-item">UTF-8</span>
-        <span class="sb-item sb-lang">RoyLang v6.5</span>
+        <span class="sb-item sb-lang">RoyLang v6.9</span>
         <button class="sb-item sb-update" id="sbUpdateBtn" title="Центр обновлений: IDE и движок RoyLang">⟳ Обновления</button>
       </div>
     </footer>
@@ -275,6 +355,7 @@
       <div class="build-body">
         <div class="build-targets" id="buildTargets">
           <button class="bld-tab active" data-target="html">🌐 HTML</button>
+          <button class="bld-tab" data-target="pwa">📱 PWA</button>
           <button class="bld-tab" data-target="zip">🗜 ZIP (Игра)</button>
           <button class="bld-tab" data-target="zip-src">📁 ZIP (Исходники)</button>
           <button class="bld-tab" data-target="exe">🪟 EXE (Windows)</button>
@@ -293,6 +374,8 @@
           <label>Иконка .ico (для .exe)<div class="build-row"><input id="bldIcon" type="text" placeholder="assets/icon.ico (необязательно)" /><button id="btnPickBuildIcon" title="Выбрать .ico файл">🖼</button></div></label>
         </div>
         <div class="build-checks">
+          <label class="chk"><input id="bldRelease" type="checkbox" checked /> Release (#if RELEASE + minify)</label>
+          <label class="chk"><input id="bldTreeShake" type="checkbox" checked /> Smart Tree-Shaking</label>
           <label class="chk"><input id="bldSingleFile" type="checkbox" checked /> Один файл (вшить ассеты)</label>
           <label class="chk"><input id="bldIncludeSrc" type="checkbox" /> Включить исходники в ZIP</label>
           <label class="chk"><input id="bldFullscreen" type="checkbox" /> Fullscreen</label>
@@ -326,6 +409,7 @@
   <div id="ctxMenu" class="ctx-menu hidden">
     <button data-act="new-file">📄 Новый файл</button>
     <button data-act="new-dir">📁 Новая папка</button>
+    <button data-act="pack-atlas">🧩 Упаковать в спрайт-атлас</button>
     <button data-act="rename">✏ Переименовать</button>
     <button data-act="delete" class="danger">🗑 Удалить</button>
   </div>
