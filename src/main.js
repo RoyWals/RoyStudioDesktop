@@ -2085,6 +2085,8 @@ async function refreshFromDisk() {
     if (!proj) return;
     const prevOpen = [...state.openTabs];
     const prevActive = state.activeFile;
+    const prevActiveText = prevActive ? state.textFiles[prevActive] : null;
+    const prevSplitText = splitFilePath ? state.textFiles[splitFilePath] : null;
     const dirtyCopy = {};
     for (const rel of state.dirty) {
       if (state.textFiles[rel] != null) dirtyCopy[rel] = state.textFiles[rel];
@@ -2099,11 +2101,31 @@ async function refreshFromDisk() {
     state.activeFile = state.openTabs.includes(prevActive) ? prevActive : (state.openTabs[0] || null);
     const entries = await fsBridge.scanProjectEntries().catch(() => []);
     if (entries.length) {
-      lastWatcherSig = entries.map(e => `${e.path}:${e.size}`).sort().join('|');
+      lastWatcherSig = entries.map(e => `${e.path}:${e.size}:${e.modified || 0}`).sort().join('|');
+    }
+    let activeReloaded = false;
+    if (state.activeFile && !state.dirty.has(state.activeFile) && state.textFiles[state.activeFile] != null && state.textFiles[state.activeFile] !== prevActiveText) {
+      if (editor) {
+        const pos = typeof editor.getPosition === 'function' ? editor.getPosition() : null;
+        editor.setValue(state.textFiles[state.activeFile]);
+        state.dirty.delete(state.activeFile);
+        if (pos && typeof editor.revealLine === 'function') editor.revealLine(pos.line || 1);
+      }
+      activeReloaded = true;
+    }
+    if (splitFilePath && !state.dirty.has(splitFilePath) && state.textFiles[splitFilePath] != null && state.textFiles[splitFilePath] !== prevSplitText) {
+      if (secondaryEditor) {
+        secondaryEditor.setValue(state.textFiles[splitFilePath]);
+        state.dirty.delete(splitFilePath);
+      }
     }
     renderTree();
     renderTabs();
     renderOutline();
+    if (activeReloaded) {
+      runDiagnostics();
+      compileAndRun();
+    }
     if (state.activeView === 'git') renderGitPane();
   } catch (err) {
     addLog(err.message || String(err), 'err');
@@ -4096,7 +4118,7 @@ function startProjectFileWatcher() {
     if (!isTauriEnv() || !state.rootPath || isWatchingRefresh) return;
     try {
       const entries = await fsBridge.scanProjectEntries();
-      const sig = entries.map(e => `${e.path}:${e.size}`).sort().join('|');
+      const sig = entries.map(e => `${e.path}:${e.size}:${e.modified || 0}`).sort().join('|');
       if (lastWatcherSig === null) {
         lastWatcherSig = sig;
         return;

@@ -16,6 +16,7 @@ pub struct FileEntry {
     pub path: String,
     pub is_dir: bool,
     pub size: u64,
+    pub modified: u64,
 }
 
 fn collect_entries(root: &Path, dir: &Path, out: &mut Vec<FileEntry>) -> Result<(), String> {
@@ -43,13 +44,21 @@ fn collect_entries(root: &Path, dir: &Path, out: &mut Vec<FileEntry>) -> Result<
                 path: rel,
                 is_dir: true,
                 size: 0,
+                modified: 0,
             });
             let _ = collect_entries(root, &p, out);
         } else {
+            let modified = meta
+                .modified()
+                .ok()
+                .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+                .map(|d| d.as_millis() as u64)
+                .unwrap_or(0);
             out.push(FileEntry {
                 path: rel,
                 is_dir: false,
                 size: meta.len(),
+                modified,
             });
         }
     }
