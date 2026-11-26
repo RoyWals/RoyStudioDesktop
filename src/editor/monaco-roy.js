@@ -4,7 +4,7 @@ const MONACO_BASE = './vendor/monaco/vs';
 
 let monacoInstance = null;
 let liveMeta = {
-  version: 'v6.9',
+  version: 'v7.0',
   keywords: [],
   apis: [],
   docsByName: new Map()
@@ -14,6 +14,8 @@ let liveAnalysis = {
   symbols: [],
   byName: new Map(),
   getActiveFile: () => null,
+  getProjectFiles: () => ({}),
+  onApplyProjectFiles: null,
   onOpenFile: null
 };
 
@@ -28,6 +30,8 @@ export function updateRoyAnalysis(symbols, helpers = null) {
   liveAnalysis.byName = byName;
   if (helpers) {
     if (typeof helpers.getActiveFile === 'function') liveAnalysis.getActiveFile = helpers.getActiveFile;
+    if (typeof helpers.getProjectFiles === 'function') liveAnalysis.getProjectFiles = helpers.getProjectFiles;
+    if (typeof helpers.onApplyProjectFiles === 'function') liveAnalysis.onApplyProjectFiles = helpers.onApplyProjectFiles;
     if (typeof helpers.onOpenFile === 'function') liveAnalysis.onOpenFile = helpers.onOpenFile;
   }
 }
@@ -35,7 +39,7 @@ export function updateRoyAnalysis(symbols, helpers = null) {
 function syncMetaFromEngine(meta) {
   const src = meta || getEngineState();
   liveMeta = {
-    version: src.version || 'v6.5',
+    version: src.version || 'v7.0',
     keywords: Array.isArray(src.keywords) ? src.keywords : [],
     apis: Array.isArray(src.apis) ? src.apis : [],
     docsByName: src.docsByName instanceof Map ? src.docsByName : new Map()
@@ -100,19 +104,54 @@ function registerRoysonLanguages(monaco) {
       monaco.languages.setMonarchTokensProvider(id, tokenDef);
     }
   }
+  if (!monaco.languages.getLanguages().some(l => l.id === 'gdscript')) {
+    monaco.languages.register({ id: 'gdscript', extensions: ['.gd'] });
+    monaco.languages.setMonarchTokensProvider('gdscript', {
+      keywords: [
+        'if', 'elif', 'else', 'for', 'while', 'match', 'break', 'continue', 'pass', 'return',
+        'class', 'class_name', 'extends', 'is', 'in', 'as', 'self', 'super', 'signal', 'func',
+        'static', 'const', 'enum', 'var', 'breakpoint', 'preload', 'await', 'yield', 'assert',
+        'void', 'and', 'or', 'not', 'true', 'false', 'null', 'PI', 'TAU', 'INF', 'NAN'
+      ],
+      typeKeywords: [
+        'bool', 'int', 'float', 'String', 'Vector2', 'Vector2i', 'Vector3', 'Vector3i',
+        'Color', 'Rect2', 'Transform2D', 'Transform3D', 'Node', 'Node2D', 'Node3D',
+        'CharacterBody2D', 'CharacterBody3D', 'Sprite2D', 'Array', 'Dictionary'
+      ],
+      tokenizer: {
+        root: [
+          [/#.*$/, 'comment'],
+          [/@[a-zA-Z_]\w*/, 'annotation'],
+          [/"([^"\\]|\\.)*"/, 'string'],
+          [/'([^'\\]|\\.)*'/, 'string'],
+          [/\b\d+(\.\d+)?\b/, 'number'],
+          [/[a-zA-Z_]\w*/, {
+            cases: {
+              '@keywords': 'keyword',
+              '@typeKeywords': 'type',
+              '@default': 'identifier'
+            }
+          }]
+        ]
+      }
+    });
+  }
 }
 
 function applyRoyMonarchTokens(monaco) {
+  const kwSet = new Set([...liveMeta.keywords, 'interface', 'trait', 'implements']);
   monaco.languages.setMonarchTokensProvider('roy', {
-    keywords: liveMeta.keywords,
+    keywords: Array.from(kwSet),
     apis: liveMeta.apis,
     tokenizer: {
       root: [
+        [/#(if|elif|else|endif|define)\b.*$/, 'metatag'],
         [/\/\/.*$/, 'comment'],
         [/\/\*/, 'comment', '@comment'],
         [/"([^"\\]|\\.)*"/, 'string'],
         [/'([^'\\]|\\.)*'/, 'string'],
         [/\b\d+(\.\d+)?\b/, 'number'],
+        [/<[A-Z][\w,\s]*>/, 'type.identifier'],
         [/(\|>|\.\.=|\.\.\.|\.\.|\?\?|\?\.|=>|==|!=|<=|>=|&&|\|\|)/, 'operator'],
         [/[a-zA-Z_$][\w$]*/, {
           cases: {
@@ -374,9 +413,24 @@ function registerRoyLanguage(monaco) {
     provideDefinition: (model, position) => {
       const w = model.getWordAtPosition(position);
       if (!w) return null;
+      const activeFile = liveAnalysis.getActiveFile();
+      const lsp = typeof window !== 'undefined' && window.RoyLang?.lsp;
+      if (lsp && typeof lsp.goToDefinition === 'function') {
+        try {
+          const res = lsp.goToDefinition(model.getValue(), position.lineNumber, position.column, liveAnalysis.getProjectFiles());
+          if (res && res.found && res.definition) {
+            const def = res.definition;
+            const targetUri = (!def.file || def.file === activeFile)
+              ? model.uri
+              : monaco.Uri.parse(`roy:///${def.file.replace(/^\/+/, '')}`);
+            const ln = Math.max(1, def.line || 1);
+            const col = Math.max(1, def.col || 1);
+            return { uri: targetUri, range: new monaco.Range(ln, col, ln, col + w.word.length) };
+          }
+        } catch {}
+      }
       const sym = liveAnalysis.byName.get(w.word);
       if (!sym || !sym.line) return null;
-      const activeFile = liveAnalysis.getActiveFile();
       const targetUri = (!sym.file || sym.file === activeFile)
         ? model.uri
         : monaco.Uri.parse(`roy:///${sym.file.replace(/^\/+/, '')}`);
@@ -389,10 +443,55 @@ function registerRoyLanguage(monaco) {
     }
   });
 
+  monaco.languages.registerReferenceProvider('roy', {
+    provideReferences: (model, position) => {
+      const lsp = typeof window !== 'undefined' && window.RoyLang?.lsp;
+      if (!lsp || typeof lsp.findReferences !== 'function') return [];
+      try {
+        const activeFile = liveAnalysis.getActiveFile();
+        const res = lsp.findReferences(model.getValue(), position.lineNumber, position.column, liveAnalysis.getProjectFiles());
+        return (res?.references || []).map(r => ({
+          uri: (!r.file || r.file === activeFile) ? model.uri : monaco.Uri.parse(`roy:///${r.file.replace(/^\/+/, '')}`),
+          range: new monaco.Range(Math.max(1, r.line || 1), Math.max(1, r.col || 1), Math.max(1, r.line || 1), Math.max(2, r.endCol || (r.col || 1) + 1))
+        }));
+      } catch {
+        return [];
+      }
+    }
+  });
+
   monaco.languages.registerRenameProvider('roy', {
     provideRenameEdits: (model, position, newName) => {
       const w = model.getWordAtPosition(position);
       if (!w || !newName || !/^[a-zA-Z_$][\w$]*$/.test(newName)) return null;
+      const activeFile = liveAnalysis.getActiveFile();
+      const lsp = typeof window !== 'undefined' && window.RoyLang?.lsp;
+      if (lsp && typeof lsp.renameSymbol === 'function') {
+        try {
+          const res = lsp.renameSymbol(model.getValue(), position.lineNumber, position.column, newName, liveAnalysis.getProjectFiles());
+          if (res && res.ok && res.files) {
+            if (typeof liveAnalysis.onApplyProjectFiles === 'function') {
+              const otherFiles = {};
+              for (const [f, content] of Object.entries(res.files)) {
+                if (f !== activeFile) otherFiles[f] = content;
+              }
+              if (Object.keys(otherFiles).length) liveAnalysis.onApplyProjectFiles(otherFiles, res.totalChanges || 0);
+            }
+            const curEdits = (res.edits && res.edits[activeFile]) || [];
+            if (curEdits.length) {
+              return {
+                edits: curEdits.map(ed => ({
+                  resource: model.uri,
+                  textEdit: {
+                    range: new monaco.Range(ed.line, ed.col, ed.line, ed.col + (ed.oldText || w.word).length),
+                    text: ed.newText || newName
+                  }
+                }))
+              };
+            }
+          }
+        } catch {}
+      }
       const matches = model.findMatches(w.word, true, false, true, null, false);
       return {
         edits: matches.map(m => ({
@@ -400,6 +499,33 @@ function registerRoyLanguage(monaco) {
           textEdit: { range: m.range, text: newName }
         }))
       };
+    }
+  });
+
+  monaco.languages.registerCodeActionProvider('roy', {
+    provideCodeActions: (model, range) => {
+      const lsp = typeof window !== 'undefined' && window.RoyLang?.lsp;
+      if (!lsp || typeof lsp.getQuickFixes !== 'function') return { actions: [], dispose: () => {} };
+      try {
+        const fixes = lsp.getQuickFixes(model.getValue(), range.startLineNumber, liveAnalysis.getProjectFiles()) || [];
+        const actions = (Array.isArray(fixes) ? fixes : []).map(fx => {
+          const targetLine = Math.max(1, fx.line || range.startLineNumber);
+          const editRange = fx.range
+            ? new monaco.Range(fx.range.startLine || targetLine, fx.range.startCol || 1, fx.range.endLine || targetLine, fx.range.endCol || model.getLineMaxColumn(targetLine))
+            : new monaco.Range(targetLine, 1, targetLine, model.getLineMaxColumn(targetLine));
+          const text = fx.replacement ?? fx.newText ?? fx.text ?? null;
+          if (text == null) return null;
+          return {
+            title: fx.title || fx.message || 'Исправить (RoyLang LSP)',
+            kind: 'quickfix',
+            edit: { edits: [{ resource: model.uri, textEdit: { range: editRange, text } }] },
+            isPreferred: true
+          };
+        }).filter(Boolean);
+        return { actions, dispose: () => {} };
+      } catch {
+        return { actions: [], dispose: () => {} };
+      }
     }
   });
 
@@ -420,10 +546,11 @@ function registerRoyLanguage(monaco) {
 export function detectMonacoLang(path) {
   const ext = (path || '').split('.').pop().toLowerCase();
   if (ext === 'roy' || ext === 'roylang') return 'roy';
-  if (ext === 'royson' || ext === 'royscene' || ext === 'royprefab' || ext === 'royanim' || ext === 'roydata' || ext === 'roymodel') return 'royson';
-  if (ext === 'royproj') return 'royproj';
+  if (ext === 'royson' || ext === 'royscene' || ext === 'royprefab' || ext === 'royanim' || ext === 'roydata' || ext === 'roymodel' || ext === 'royui') return 'royson';
+  if (ext === 'royproj' || ext === 'roypkg') return 'royproj';
   if (ext === 'json' || ext === 'jsonl' || ext === 'tmj' || ext === 'ldtk' || ext === 'gltf') return 'json';
   if (ext === 'lua' || ext === 'luau') return 'lua';
+  if (ext === 'gd') return 'gdscript';
   if (ext === 'py') return 'python';
   if (ext === 'glsl' || ext === 'frag' || ext === 'vert' || ext === 'wgsl' || ext === 'hlsl' || ext === 'cpp' || ext === 'c' || ext === 'h' || ext === 'hpp') return 'cpp';
   if (ext === 'html' || ext === 'htm') return 'html';
@@ -433,7 +560,7 @@ export function detectMonacoLang(path) {
   if (ext === 'md') return 'markdown';
   if (ext === 'tmx' || ext === 'xml' || ext === 'svg') return 'xml';
   if (ext === 'yaml' || ext === 'yml') return 'yaml';
-  if (ext === 'ini' || ext === 'cfg') return 'ini';
+  if (ext === 'ini' || ext === 'cfg' || ext === 'tscn' || ext === 'tres' || ext === 'godot') return 'ini';
   if (ext === 'bat') return 'bat';
   if (ext === 'ps1') return 'powershell';
   if (ext === 'sh') return 'shell';
@@ -443,7 +570,7 @@ export function detectMonacoLang(path) {
   return 'plaintext';
 }
 
-export async function createRoyEditor(hostEl, { onChange, onSave, onRun, onCursor, onCmdPalette }) {
+export async function createRoyEditor(hostEl, { onChange, onSave, onRun, onCursor, onCmdPalette, onToggleBreakpoint }) {
   let wordWrapOn = false;
   let minimapOn = true;
   let fontSize = 13;
@@ -463,7 +590,17 @@ export async function createRoyEditor(hostEl, { onChange, onSave, onRun, onCurso
       scrollBeyondLastLine: false,
       smoothScrolling: true,
       cursorBlinking: 'smooth',
-      colorDecorators: true
+      colorDecorators: true,
+      glyphMargin: true,
+      lightbulb: { enabled: 'on' }
+    });
+
+    let bpDecoIds = [];
+    let dbgLineDecoIds = [];
+    editor.onMouseDown((e) => {
+      if (e.target.type === monaco.editor.MouseTargetType.GUTTER_GLYPH_MARGIN && e.target.position && onToggleBreakpoint) {
+        onToggleBreakpoint(e.target.position.lineNumber);
+      }
     });
 
     editor.onDidChangeModelContent(() => onChange(editor.getValue()));
@@ -560,6 +697,14 @@ export async function createRoyEditor(hostEl, { onChange, onSave, onRun, onCurso
         editor.updateOptions({ fontSize });
         return fontSize;
       },
+      setFontSize: (sz) => {
+        fontSize = Math.max(10, Math.min(28, Number(sz) || 13));
+        editor.updateOptions({ fontSize });
+        return fontSize;
+      },
+      setTheme: (themeName) => {
+        monaco.editor.setTheme(themeName || 'vs-dark');
+      },
       getOptionsState: () => ({ wordWrap: wordWrapOn, minimap: minimapOn, fontSize }),
       setMarkers: (diags) => {
         const model = editor.getModel();
@@ -572,6 +717,19 @@ export async function createRoyEditor(hostEl, { onChange, onSave, onRun, onCurso
           endLineNumber: Math.max(1, d.line || 1),
           endColumn: Math.max(2, (d.col || 1) + 8)
         })));
+      },
+      setBreakpoints: (lines) => {
+        const list = Array.isArray(lines) ? lines : [];
+        bpDecoIds = editor.deltaDecorations(bpDecoIds, list.map(ln => ({
+          range: new monaco.Range(ln, 1, ln, 1),
+          options: { isWholeLine: false, glyphMarginClassName: 'roy-bp-glyph', glyphMarginHoverMessage: { value: `Breakpoint · строка ${ln}` } }
+        })));
+      },
+      setDebugCurrentLine: (line) => {
+        dbgLineDecoIds = editor.deltaDecorations(dbgLineDecoIds, line ? [{
+          range: new monaco.Range(line, 1, line, 1),
+          options: { isWholeLine: true, className: 'roy-dbg-line', glyphMarginClassName: 'roy-dbg-arrow' }
+        }] : []);
       }
     };
   } catch {
@@ -627,9 +785,34 @@ export async function createRoyEditor(hostEl, { onChange, onSave, onRun, onCurso
         return fontSize;
       },
       getOptionsState: () => ({ wordWrap: wordWrapOn, minimap: minimapOn, fontSize }),
-      setMarkers: () => {}
+      setMarkers: () => {},
+      setBreakpoints: () => {},
+      setDebugCurrentLine: () => {}
     };
   }
+}
+
+export async function createDiffEditor(hostEl, originalText, modifiedText, langId = 'roy') {
+  const monaco = await loadMonacoScript();
+  registerRoyLanguage(monaco);
+  const diffEd = monaco.editor.createDiffEditor(hostEl, {
+    automaticLayout: true,
+    readOnly: true,
+    originalEditable: false,
+    renderSideBySide: true,
+    scrollBeyondLastLine: false,
+    fontSize: 13
+  });
+  const origModel = monaco.editor.createModel(String(originalText ?? ''), langId);
+  const modModel = monaco.editor.createModel(String(modifiedText ?? ''), langId);
+  diffEd.setModel({ original: origModel, modified: modModel });
+  return {
+    dispose: () => {
+      diffEd.dispose();
+      origModel.dispose();
+      modModel.dispose();
+    }
+  };
 }
 
 export async function createSecondaryEditor(hostEl, { onChange, onSave, onRun }) {

@@ -8,8 +8,8 @@ import {
   sortSemverDesc
 } from './core/engine-manager.js';
 import { createFsBridge, isTauriEnv, isTextFile, isImageFile, isMediaFile, getExt } from './fs-bridge.js';
-import { createRoyEditor, createSecondaryEditor, detectMonacoLang, updateRoyLanguageMeta, updateRoyAnalysis } from './editor/monaco-roy.js';
-import { sendStudioCmd, renderImageGridOverlay, packFolderToSpriteAtlas, PROJECT_TEMPLATES } from './studio-extras.js';
+import { createRoyEditor, createSecondaryEditor, createDiffEditor, detectMonacoLang, updateRoyLanguageMeta, updateRoyAnalysis } from './editor/monaco-roy.js';
+import { sendStudioCmd, renderImageGridOverlay, packFolderToSpriteAtlas, mountModel3DViewer, mountPixelEditor, mountRoyUiDesigner, mountCutsceneGraphEditor, PROJECT_TEMPLATES } from './studio-extras.js';
 
 const fsBridge = createFsBridge();
 
@@ -58,6 +58,10 @@ function renderRecent() {
 
 const el = id => document.getElementById(id);
 let editor = null;
+let secondaryEditor = null;
+let splitFilePath = null;
+let lastWatcherSig = null;
+let isWatchingRefresh = false;
 let diagTimer = null;
 let autoSaveTimer = null;
 
@@ -240,6 +244,12 @@ function getFileIconSvg(path) {
   }
   if (ext === 'lua' || ext === 'luau') {
     return `<svg viewBox="0 0 16 16" width="14" height="14"><circle cx="8" cy="8.5" r="5.5" fill="#1e3a8a" stroke="#60a5fa" stroke-width="1.2"/><circle cx="10.2" cy="6.2" r="1.4" fill="#93c5fd"/><circle cx="13" cy="3.2" r="1.3" fill="#60a5fa"/></svg>`;
+  }
+  if (ext === 'cs') {
+    return `<svg viewBox="0 0 16 16" width="14" height="14"><rect x="1" y="1" width="14" height="14" rx="2.5" fill="#2e1065" stroke="#a855f7" stroke-width="1"/><text x="8" y="11.4" text-anchor="middle" font-size="7.5" font-weight="800" fill="#e9d5ff" font-family="sans-serif">C#</text></svg>`;
+  }
+  if (ext === 'gd' || ext === 'tscn' || ext === 'tres' || ext === 'godot') {
+    return `<svg viewBox="0 0 16 16" width="14" height="14"><rect x="1" y="1" width="14" height="14" rx="2.5" fill="#1e3a5f" stroke="#478cbf" stroke-width="1"/><text x="8" y="11.4" text-anchor="middle" font-size="7.2" font-weight="800" fill="#93c5fd" font-family="sans-serif">GD</text></svg>`;
   }
   if (ext === 'py') {
     return `<svg viewBox="0 0 16 16" width="14" height="14"><rect x="1" y="1" width="14" height="14" rx="2.5" fill="#1e3a5f" stroke="#38bdf8" stroke-width="1"/><text x="8" y="11.4" text-anchor="middle" font-size="7.5" font-weight="800" fill="#fde047" font-family="sans-serif">PY</text></svg>`;
@@ -675,14 +685,74 @@ async function showFontTab(path) {
   document.querySelector('.sb-lang').textContent = 'Шрифт';
 }
 
+let activeModel3DCleanup = null;
+let activeDiffEditor = null;
+let activeDiffPath = null;
+
+function closeDiffViewer() {
+  el('diffViewer')?.classList.add('hidden');
+  if (activeDiffEditor) {
+    try { activeDiffEditor.dispose(); } catch {}
+    activeDiffEditor = null;
+  }
+  activeDiffPath = null;
+}
+
+async function openGitDiff(path) {
+  if (!path) return;
+  closeDiffViewer();
+  el('welcomeScreen')?.classList.add('hidden');
+  el('imageViewer')?.classList.add('hidden');
+  el('editorSplitWrap')?.classList.add('hidden');
+  el('diffViewer')?.classList.remove('hidden');
+  activeDiffPath = path;
+  el('diffTitle').textContent = `Git Diff: ${path} (HEAD ↔ Рабочая копия)`;
+  const orig = await fsBridge.gitShowHead(path).catch(() => '');
+  const mod = state.textFiles[path] != null ? state.textFiles[path] : '';
+  el('diffHost').innerHTML = '';
+  activeDiffEditor = await createDiffEditor(el('diffHost'), orig, mod, detectMonacoLang(path));
+  document.querySelector('.sb-lang').textContent = 'Git Diff';
+}
+
+el('btnDiffClose')?.addEventListener('click', () => {
+  closeDiffViewer();
+  if (state.activeFile) openFile(state.activeFile);
+  else el('editorSplitWrap')?.classList.remove('hidden');
+});
+el('btnDiffOpenEdit')?.addEventListener('click', () => {
+  const target = activeDiffPath;
+  closeDiffViewer();
+  if (target) openFile(target);
+});
+
+function showModel3DTab(path) {
+  closeDiffViewer();
+  el('welcomeScreen')?.classList.add('hidden');
+  el('editorSplitWrap')?.classList.add('hidden');
+  el('imageViewer').classList.remove('hidden');
+  if (activeModel3DCleanup) { try { activeModel3DCleanup(); } catch {} activeModel3DCleanup = null; }
+  activeModel3DCleanup = mountModel3DViewer(el('ivStage'), el('ivControls'), el('ivMeta'), {
+    path,
+    text: state.textFiles[path] || '',
+    base64: state.assetBase64[path] || ''
+  });
+  document.querySelector('.sb-lang').textContent = '3D Модель';
+}
+
 function openFile(path, line = null, fromHistory = false) {
+  closeDiffViewer();
+  el('pixelViewer')?.classList.add('hidden');
+  el('uiDesignerViewer')?.classList.add('hidden');
+  el('cutsceneViewer')?.classList.add('hidden');
+  if (activeModel3DCleanup) { try { activeModel3DCleanup(); } catch {} activeModel3DCleanup = null; }
   const ext = getExt(path);
   const hasText = state.textFiles[path] != null;
   const isImg = isImageFile(path) && state.assetUrls[path] != null;
   const isAudio = ['mp3', 'ogg', 'wav', 'flac', 'm4a', 'mid', 'midi'].includes(ext) && state.assetUrls[path] != null;
   const isVideo = ['webm', 'mp4'].includes(ext) && state.assetUrls[path] != null;
   const isFont = ['ttf', 'otf', 'woff', 'woff2'].includes(ext) && state.assetUrls[path] != null;
-  if (!hasText && !isImg && !isAudio && !isVideo && !isFont) return;
+  const isModel3D = ['obj', 'gltf', 'glb'].includes(ext) && (hasText || state.assetBase64[path] != null);
+  if (!hasText && !isImg && !isAudio && !isVideo && !isFont && !isModel3D) return;
   el('welcomeScreen')?.classList.add('hidden');
   if (!state.openTabs.includes(path)) state.openTabs.push(path);
   if (!fromHistory) {
@@ -696,7 +766,9 @@ function openFile(path, line = null, fromHistory = false) {
   state.activeFile = path;
   rememberRecent({ rootPath: state.rootPath, name: state.projectName }, path);
 
-  if (isImg && !hasText) {
+  if (isModel3D) {
+    showModel3DTab(path);
+  } else if (isImg && !hasText) {
     showImageTab(path);
   } else if (isVideo && !hasText) {
     showVideoTab(path);
@@ -722,6 +794,11 @@ function openFile(path, line = null, fromHistory = false) {
       roydata: 'RoyData',
       luau: 'Luau',
       lua: 'Lua',
+      cs: 'C#',
+      gd: 'GDScript',
+      tscn: 'Godot Scene',
+      tres: 'Godot Resource',
+      godot: 'Godot Project',
       py: 'Python',
       glsl: 'GLSL',
       frag: 'GLSL',
@@ -754,6 +831,7 @@ function openFile(path, line = null, fromHistory = false) {
   renderTabs();
   renderOutline();
   runDiagnostics();
+  if (typeof syncEditorBreakpoints === 'function') syncEditorBreakpoints();
 }
 
 function renderOutline() {
@@ -872,7 +950,7 @@ function renderProblems() {
 }
 
 function runDiagnostics() {
-  const royFiles = getRoyOnlyFiles();
+  const compilerFiles = collectProjectFilesForCompiler();
   const entry = pickEntryFile();
   const diags = [];
 
@@ -880,9 +958,21 @@ function runDiagnostics() {
     state.entryFile = entry;
     if (typeof RoyLang.analyze === 'function') {
       try {
-        const rep = RoyLang.analyze(royFiles[entry], royFiles, entry);
+        const rep = RoyLang.analyze(state.textFiles[entry], compilerFiles, entry);
         updateRoyAnalysis(rep?.symbols || [], {
           getActiveFile: () => state.activeFile,
+          getProjectFiles: () => getRoyOnlyFiles(),
+          onApplyProjectFiles: (otherFiles, totalChanges) => {
+            for (const [rel, txt] of Object.entries(otherFiles)) {
+              if (state.textFiles[rel] != null && state.textFiles[rel] !== txt) {
+                state.textFiles[rel] = txt;
+                state.dirty.add(rel);
+              }
+            }
+            renderTree();
+            renderTabs();
+            addLog(`LSP Rename: обновлено ${totalChanges} вхождений по проекту`, 'info');
+          },
           onOpenFile: (rel, ln) => {
             if (state.textFiles[rel] != null) openFile(rel, ln || 1);
           }
@@ -898,7 +988,7 @@ function runDiagnostics() {
       }
     } else {
       try {
-        const res = RoyLang.compile(royFiles[entry], royFiles, entry);
+        const res = RoyLang.compile(state.textFiles[entry], compilerFiles, entry);
         for (const w of (res.warnings || [])) {
           diags.push({ severity: 'warning', message: w.message || String(w), line: w.line || 1, col: w.col || 1, file: w.file || entry });
         }
@@ -950,7 +1040,7 @@ function runDiagnostics() {
   ].map(p => String(p).replace(/^\.\//, '').replace(/^\/+/, '').toLowerCase()));
   const assetCallRe = /\b(?:loadSprite|loadImage|loadSound|loadMusic|playMusic|loadFont|loadTilemap|loadModel3D|loadObj3D|loadJson|loadRoyson)\s*\(\s*["']([^"']+)["']/g;
   const assetExtRe = /\.(?:png|jpe?g|webp|avif|gif|svg|bmp|mp3|ogg|wav|flac|m4a|mid|midi|webm|mp4|json|jsonl|csv|royson|royscene|royprefab|royanim|roymodel|roydata|tmj|tmx|ldtk|obj|mtl|gltf|glb|ttf|otf|woff2?|fnt)$/i;
-  for (const [file, code] of Object.entries(royFiles)) {
+  for (const [file, code] of Object.entries(getRoyOnlyFiles())) {
     const lines = String(code || '').split('\n');
     for (let li = 0; li < lines.length; li++) {
       assetCallRe.lastIndex = 0;
@@ -985,11 +1075,13 @@ function runDiagnostics() {
 
 function collectProjectFilesForCompiler() {
   const out = {};
-  for (const [rel, content] of Object.entries(state.textFiles)) {
+  for (const [rawRel, content] of Object.entries(state.textFiles)) {
+    const rel = String(rawRel).replace(/\\/g, '/');
     if (/^(dist|node_modules|\.git)\//i.test(rel)) continue;
     out[rel] = { type: 'text', content: String(content) };
   }
-  for (const [rel, b64] of Object.entries(state.assetBase64 || {})) {
+  for (const [rawRel, b64] of Object.entries(state.assetBase64 || {})) {
+    const rel = String(rawRel).replace(/\\/g, '/');
     if (/^(dist|node_modules|\.git)\//i.test(rel) || out[rel]) continue;
     out[rel] = {
       type: 'base64',
@@ -1080,10 +1172,43 @@ function injectAssetAndLogBridge(html, includeLogBridge = true, embedDataUrls = 
           try { parent.postMessage({ type: 'roystudio-action', action: 'rerun' }, '*'); } catch {}
         }
       });
+      var hostSeq = 0;
+      var hostPending = {};
+      window.addEventListener('message', function(ev) {
+        var d = ev && ev.data;
+        if (!d) return;
+        if (d.type === 'roystudio-host-reply' && hostPending[d.id]) {
+          var p = hostPending[d.id];
+          delete hostPending[d.id];
+          if (d.error) p.reject(new Error(d.error));
+          else p.resolve(d.result);
+        } else if (d.type === 'roy-host-event' && window.__ROY_RT__ && typeof window.__ROY_RT__.onHostEvent === 'function') {
+          try {
+            if (window.__ROY_HOST_LISTENERS__ && window.__ROY_HOST_LISTENERS__[d.event]) {
+              window.__ROY_HOST_LISTENERS__[d.event].forEach(function(fn) { fn(d.data, d.event); });
+            }
+          } catch {}
+        }
+      });
+      window.__ROY_HOST__ = {
+        call: function(cmd, payload) {
+          return new Promise(function(resolve, reject) {
+            var id = ++hostSeq;
+            hostPending[id] = { resolve: resolve, reject: reject };
+            parent.postMessage({ type: 'roystudio-host-call', id: id, cmd: cmd, payload: payload || {} }, '*');
+          });
+        }
+      };
     })();
   <\/script>` : '';
 
-  return html.replace('<head>', '<head>' + assetHook + logHook);
+  let outHtml = html;
+  if (includeLogBridge) {
+    const rawDbgHook = 'try{window.__ROY_RT__=__rt;if(__rt&&__rt.royDebugger){__rt.royDebugger.onPause(function(f){parent.postMessage({type:"roystudio-dbg-pause",frame:f,stack:__rt.royDebugger.getCallStack()},"*");});window.addEventListener("message",function(ev){var d=ev&&ev.data;if(!d||d.type!=="roy-dbg-cmd")return;var dbg=__rt.royDebugger;if(d.cmd==="setBreakpoints"&&Array.isArray(d.list)){dbg.clearBreakpoints();d.list.forEach(function(b){dbg.setBreakpoint(b.file,b.line);});}else if(d.cmd==="pause")dbg.pause();else if(d.cmd==="resume")dbg.resume();else if(d.cmd==="stepOver")dbg.stepOver();else if(d.cmd==="stepInto")dbg.stepInto();});}}catch(_){}\n';
+    const dbgHook = JSON.stringify(rawDbgHook).slice(1, -1);
+    outHtml = outHtml.replace('"code":"', '"code":"' + dbgHook);
+  }
+  return outHtml.replace('<head>', '<head>' + assetHook + logHook);
 }
 
 function buildHtmlProjectPreview(entryHtml) {
@@ -1099,6 +1224,8 @@ function buildHtmlProjectPreview(entryHtml) {
   return html;
 }
 
+let lastSourceMap = null;
+
 function buildCompiledOutput(includeLogBridge = true, opts = {}) {
   const entry = (opts.entryOverride && state.textFiles[opts.entryOverride] != null)
     ? opts.entryOverride
@@ -1109,11 +1236,21 @@ function buildCompiledOutput(includeLogBridge = true, opts = {}) {
   const embedDataUrls = Boolean(opts.embedDataUrls);
   if (entry.endsWith('.roy') || entry.endsWith('.roylang')) {
     const projectFiles = collectProjectFilesForCompiler();
+    const isDebugPreview = includeLogBridge && !opts.release;
     const compileOpts = {
       release: Boolean(opts.release),
       minify: Boolean(opts.minify),
-      treeShake: opts.treeShake !== false
+      treeShake: opts.treeShake !== false,
+      debug: isDebugPreview,
+      sourceMap: isDebugPreview
     };
+    if (isDebugPreview) {
+      try {
+        lastSourceMap = RoyLang.compile(state.textFiles[entry], projectFiles, entry, compileOpts)?.sourceMap || null;
+      } catch {
+        lastSourceMap = null;
+      }
+    }
     const rawHtml = RoyLang.compileToHtml(state.textFiles[entry], { title }, projectFiles, entry, compileOpts);
     return {
       entry,
@@ -1136,7 +1273,17 @@ function compileAndRun() {
   try {
     const built = buildCompiledOutput(true);
     if (!built) return;
-    el('previewFrame').srcdoc = built.html;
+    if (editor && typeof editor.setDebugCurrentLine === 'function') editor.setDebugCurrentLine(null);
+    const frame = el('previewFrame');
+    frame.onload = () => {
+      try {
+        frame.contentWindow?.postMessage({ type: 'roy-dbg-cmd', cmd: 'setBreakpoints', list: state.breakpoints || [] }, '*');
+      } catch {}
+    };
+    frame.srcdoc = built.html;
+    if (el('previewViewport')?.classList.contains('is-dual') && el('previewFrame2')) {
+      el('previewFrame2').srcdoc = built.html;
+    }
     addLog(`Запуск ${built.entry} (модулей: ${built.count}, ассетов: ${Object.keys(state.assetUrls).length})`, 'info');
   } catch (err) {
     addLog(`Ошибка сборки: ${err.message || err}`, 'err');
@@ -1145,6 +1292,9 @@ function compileAndRun() {
 
 async function saveActiveFile() {
   if (!state.activeFile || state.textFiles[state.activeFile] == null) return;
+  if (ideSettings.formatOnSave && !state.autoSave) {
+    formatActiveDocument();
+  }
   await fsBridge.writeFile(state.activeFile, state.textFiles[state.activeFile]);
   state.dirty.delete(state.activeFile);
   if (state.activeFile.endsWith('.royproj')) {
@@ -1359,27 +1509,87 @@ function setBuildLog(msg, isErr = false) {
   node.style.borderColor = isErr ? 'rgba(239,68,68,0.45)' : '';
 }
 
+const NATIVE_COMPILE_TARGETS = ['android', 'luau', 'lua', 'csharp', 'gdscript', 'server', 'wasm'];
+const ALL_BUILD_TARGETS = ['html', 'pwa', 'zip', 'zip-src', 'exe', ...NATIVE_COMPILE_TARGETS];
+
+function updateBuildAnalysisPreview() {
+  const box = el('buildAnalysisBox');
+  if (!box) return;
+  const entry = el('bldEntry')?.value.trim() || pickEntryFile() || 'main.roy';
+  const src = state.textFiles[entry];
+  if (!src || (!entry.endsWith('.roy') && !entry.endsWith('.roylang'))) {
+    box.innerHTML = '';
+    return;
+  }
+  if (NATIVE_COMPILE_TARGETS.includes(buildModalTarget)) {
+    if (typeof RoyLang.lintTarget !== 'function') { box.innerHTML = ''; return; }
+    try {
+      const lint = RoyLang.lintTarget(src, buildModalTarget);
+      const warns = lint?.warnings || [];
+      const st = lint?.stats || {};
+      box.innerHTML = `
+        <div class="ba-row">
+          <strong>Target Linter (${escapeHtml(buildModalTarget)}):</strong>
+          <span>API: ${st.supportedCalls || 0} · Bridge: ${st.bridgeCalls || 0} · Предупреждений: ${warns.length}</span>
+        </div>
+        ${warns.length ? `<div class="ba-warns">${warns.slice(0, 4).map(w => `⚠ ${escapeHtml(w.message || String(w))}`).join('<br/>')}</div>` : '<div class="ba-ok">✓ Совместимость с таргетом проверена</div>'}
+      `;
+    } catch (e) {
+      box.innerHTML = `<div class="ba-warns">⚠ ${escapeHtml(e.message || String(e))}</div>`;
+    }
+    return;
+  }
+  if (buildModalTarget === 'zip-src' || typeof RoyLang.analyzeBundle !== 'function') {
+    box.innerHTML = '';
+    return;
+  }
+  try {
+    const ab = RoyLang.analyzeBundle(src);
+    const loaded = (ab.loadedPacks || []).join(', ') || 'core';
+    box.innerHTML = `
+      <div class="ba-row">
+        <strong>Smart Tree-Shaking (${(ab.packs || []).length} пакетов):</strong>
+        <span>Пакеты: <code>${escapeHtml(loaded)}</code> · Экономия: <strong>-${ab.savedKB || 0} КБ (${ab.savedPct || 0}%)</strong> (итого ${ab.bundleKB || 0} КБ)</span>
+      </div>
+    `;
+  } catch {
+    box.innerHTML = '';
+  }
+}
+
 function syncBuildTargetUi() {
   document.querySelectorAll('#buildTargets .bld-tab').forEach(btn => {
     btn.classList.toggle('active', btn.dataset.target === buildModalTarget);
   });
+  const isNativeTarget = NATIVE_COMPILE_TARGETS.includes(buildModalTarget);
   const iconRow = document.querySelector('.build-icon-row');
   if (iconRow) iconRow.classList.toggle('hidden', buildModalTarget !== 'exe');
+  el('buildAndroidRow')?.classList.toggle('hidden', buildModalTarget !== 'android');
+  if (buildModalTarget !== 'android') el('buildAndroidActions')?.classList.add('hidden');
   const chkSingle = el('bldSingleFile')?.closest('.chk');
   const chkSrc = el('bldIncludeSrc')?.closest('.chk');
   const chkFull = el('bldFullscreen')?.closest('.chk');
   const chkRes = el('bldResizable')?.closest('.chk');
-  if (chkSingle) chkSingle.classList.toggle('hidden', buildModalTarget === 'zip-src' || buildModalTarget === 'exe');
+  if (chkSingle) chkSingle.classList.toggle('hidden', buildModalTarget === 'zip-src' || buildModalTarget === 'exe' || isNativeTarget);
   if (chkSrc) chkSrc.classList.toggle('hidden', buildModalTarget !== 'zip');
   if (chkFull) chkFull.classList.toggle('hidden', buildModalTarget !== 'exe');
   if (chkRes) chkRes.classList.toggle('hidden', buildModalTarget !== 'exe');
   const labels = {
     html: '🌐 Экспортировать .html',
+    pwa: '📱 Собрать PWA (.zip)',
     zip: '🗜 Собрать .zip (Игра)',
     'zip-src': '📁 Собрать .zip (Исходники)',
-    exe: '🪟 Собрать .exe (Windows)'
+    exe: '🪟 Собрать .exe (Windows)',
+    android: '📱 Собрать Android (.apk)',
+    luau: '🟦 Собрать Roblox Luau',
+    lua: '🌙 Собрать Lua / LÖVE2D',
+    csharp: '🟪 Собрать Unity C#',
+    gdscript: '🤖 Собрать Godot 4',
+    server: '🖥 Собрать Server (Node.js)',
+    wasm: '⚡ Собрать WebAssembly (.wasm)'
   };
   el('btnStartBuild').textContent = labels[buildModalTarget] || '🔨 Собрать';
+  updateBuildAnalysisPreview();
 }
 
 function openBuildModal(presetTarget = null) {
@@ -1394,14 +1604,19 @@ function openBuildModal(presetTarget = null) {
   el('bldBg').value = mf.bg || '#0b0f1a';
   el('bldOutDir').value = mf.build?.outDir || 'dist';
   el('bldIcon').value = mf.build?.icon || mf.icon || '';
+  const defSlug = (mf.name || state.projectName || 'mygame').toLowerCase().replace(/[^a-z0-9]+/g, '') || 'mygame';
+  if (el('bldPkgId')) el('bldPkgId').value = mf.build?.packageId || `com.roywals.${defSlug}`;
+  if (el('bldVersionCode')) el('bldVersionCode').value = mf.build?.versionCode || 1;
+  if (el('bldOrientation')) el('bldOrientation').value = mf.build?.orientation || 'auto';
+  el('buildAndroidActions')?.classList.add('hidden');
   el('bldSingleFile').checked = mf.build?.singleFile !== false;
   el('bldIncludeSrc').checked = Boolean(mf.build?.includeSources);
   el('bldFullscreen').checked = Boolean(mf.build?.fullscreen);
   el('bldResizable').checked = mf.build?.resizable !== false;
   el('bldSaveManifest').checked = true;
-  if (presetTarget && ['html', 'zip', 'zip-src', 'exe'].includes(presetTarget)) {
+  if (presetTarget && ALL_BUILD_TARGETS.includes(presetTarget)) {
     buildModalTarget = presetTarget;
-  } else if (['html', 'zip', 'zip-src', 'exe'].includes(mf.build?.target)) {
+  } else if (ALL_BUILD_TARGETS.includes(mf.build?.target)) {
     buildModalTarget = mf.build.target;
   } else {
     buildModalTarget = 'html';
@@ -1634,6 +1849,126 @@ async function runBuildPipeline() {
         `\nWebView2Loader.dll: ${res.copied_loader ? 'скопирован рядом' : 'рядом уже присутствует / встроен'}`
       );
       addLog(`.exe собран: ${res.exe_path} (${formatBytesSize(res.size_bytes)})`, 'info');
+    } else if (NATIVE_COMPILE_TARGETS.includes(buildModalTarget)) {
+      if (typeof RoyLang.compileToTarget !== 'function') {
+        throw new Error('compileToTarget недоступен в текущей версии движка');
+      }
+      setBuildLog(`Проверка и компиляция в таргет ${buildModalTarget}...`);
+      const royFiles = getRoyOnlyFiles();
+      const compilerFiles = collectProjectFilesForCompiler();
+      const lint = typeof RoyLang.lintTarget === 'function' ? RoyLang.lintTarget(royFiles[entry], buildModalTarget) : null;
+      const pkgSlug = (slug || 'mygame').replace(/[^a-z0-9]+/gi, '').toLowerCase() || 'mygame';
+      const targetOpts = buildModalTarget === 'android'
+        ? {
+            appName: name,
+            packageId: el('bldPkgId')?.value.trim() || `com.roywals.${pkgSlug}`,
+            versionName: version || '1.0.0',
+            versionCode: Math.max(1, Number(el('bldVersionCode')?.value) || 1),
+            orientation: el('bldOrientation')?.value || 'auto',
+            release
+          }
+        : { title: name, release };
+      const compiled = RoyLang.compileToTarget(royFiles[entry], buildModalTarget, compilerFiles, entry, targetOpts);
+      const outFiles = compiled?.files || {};
+      const fileEntries = [];
+      for (const [fName, content] of Object.entries(outFiles)) {
+        if (content instanceof Uint8Array) {
+          let bin = '';
+          for (let i = 0; i < content.length; i++) bin += String.fromCharCode(content[i]);
+          fileEntries.push({ path: fName, is_base64: true, data: btoa(bin) });
+        } else {
+          fileEntries.push({ path: fName, is_base64: false, data: String(content) });
+        }
+      }
+      if (buildModalTarget === 'wasm' && (compiled?.wasmBytes || compiled?.wasmBase64) && !outFiles['main.wasm']) {
+        let b64 = compiled.wasmBase64;
+        if (!b64 && compiled.wasmBytes) {
+          const bytes = new Uint8Array(compiled.wasmBytes);
+          let bin = '';
+          for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+          b64 = btoa(bin);
+        }
+        if (b64) fileEntries.push({ path: 'main.wasm', is_base64: true, data: b64 });
+      }
+      const dir = await resolveOutDir();
+      if (!dir) { setBuildLog('Сборка отменена: не выбрана папка вывода.'); return; }
+      const targetDir = joinBuildPath(dir, `${slug}-${buildModalTarget}`);
+      if (isTauriEnv()) {
+        for (const fe of fileEntries) {
+          const dest = joinBuildPath(targetDir, fe.path);
+          if (fe.is_base64) await fsBridge.writeBase64Absolute(dest, fe.data);
+          else await fsBridge.writeTextAbsolute(dest, fe.data);
+        }
+        lastBuildDirPath = targetDir;
+        el('btnOpenBuildDir').disabled = false;
+
+        if (buildModalTarget === 'android') {
+          const actionsBar = el('buildAndroidActions');
+          const btnOpenApk = el('btnAndroidOpenApk');
+          const btnOpenProj = el('btnAndroidOpenProj');
+          const btnBuildPwa = el('btnAndroidBuildPwa');
+          actionsBar?.classList.add('hidden');
+          btnOpenApk?.classList.add('hidden');
+
+          const logLines = [`Проект Android сгенерирован (${fileEntries.length} файл.): ${targetDir}`, 'Запуск локальной сборки APK...'];
+          setBuildLog(logLines.join('\n'));
+          const unlisten = await fsBridge.onTauriEvent('android-build-log', (line) => {
+            logLines.push(String(line));
+            if (logLines.length > 160) logLines.splice(0, logLines.length - 160);
+            setBuildLog(logLines.join('\n'));
+            const logEl = el('buildLog');
+            if (logEl) logEl.scrollTop = logEl.scrollHeight;
+          });
+          let apkRes = null;
+          try {
+            apkRes = await fsBridge.buildAndroidApk(targetDir);
+          } finally {
+            try { unlisten(); } catch {}
+          }
+
+          if (apkRes?.ok) {
+            lastBuildDirPath = apkRes.apk_dir || targetDir;
+            el('buildResultInfo').textContent = `${slug}-debug.apk`;
+            logLines.push('', `✅ Готово! APK: ${apkRes.apk_path}`);
+            setBuildLog(logLines.join('\n'));
+            actionsBar?.classList.remove('hidden');
+            btnOpenProj?.classList.add('hidden');
+            btnBuildPwa?.classList.add('hidden');
+            btnOpenApk?.classList.remove('hidden');
+            addLog(`Android APK собран: ${apkRes.apk_path}`, 'info');
+          } else {
+            const missText = apkRes?.missing?.length
+              ? `\nНе хватает инструментов:\n- ${apkRes.missing.join('\n- ')}`
+              : '';
+            logLines.push(
+              '',
+              `⚠ ${apkRes?.message || 'Локальная сборка APK не выполнена.'}${missText}`,
+              '',
+              'Варианты:',
+              '1) Откройте папку проекта — внутри уже есть .github/workflows/build-apk.yml для бесплатной сборки .apk в GitHub Actions без установки SDK.',
+              '2) Или соберите PWA-версию (RoyLang.compileToPwaFiles) для мгновенного запуска на телефоне.'
+            );
+            setBuildLog(logLines.join('\n'));
+            el('buildResultInfo').textContent = `${slug}-android (проект готов)`;
+            actionsBar?.classList.remove('hidden');
+            btnOpenProj?.classList.remove('hidden');
+            btnBuildPwa?.classList.remove('hidden');
+            btnOpenApk?.classList.add('hidden');
+          }
+        } else {
+          const outZip = joinBuildPath(dir, `${slug}-${buildModalTarget}.zip`);
+          const zipBytes = await fsBridge.exportZipArchive(outZip, fileEntries);
+          el('buildResultInfo').textContent = `${slug}-${buildModalTarget} · ${fileEntries.length} файл. (${formatBytesSize(zipBytes)} zip)`;
+          const warnCount = (lint?.warnings?.length || 0) + (compiled?.warnings?.length || 0);
+          setBuildLog(
+            `Таргет ${buildModalTarget} собран!\nПапка: ${targetDir}\nZIP: ${outZip}\nФайлы: ${fileEntries.map(f => f.path).join(', ')}` +
+            (warnCount ? `\nПредупреждений: ${warnCount}` : '')
+          );
+          addLog(`Таргет ${buildModalTarget} собран: ${targetDir}`, 'info');
+        }
+      } else {
+        setBuildLog(`Таргет ${buildModalTarget} скомпилирован (${fileEntries.length} файл.): ${fileEntries.map(f => f.path).join(', ')}`);
+      }
     }
   } catch (err) {
     setBuildLog(`Ошибка сборки: ${err.message || err}`, true);
@@ -1716,6 +2051,9 @@ function loadProjectState(proj, opts = {}) {
   state.tabHistoryIdx = -1;
   state.diagIdx = -1;
   state.activeFile = null;
+  lastWatcherSig = null;
+  splitFilePath = null;
+  toggleSplitEditor(false);
   state.projectName = proj.name;
   rememberRecent(proj);
   renderRecent();
@@ -1738,9 +2076,6 @@ function loadProjectState(proj, opts = {}) {
   compileAndRun();
   if (state.activeView === 'git') renderGitPane();
 }
-
-let lastWatcherSig = null;
-let isWatchingRefresh = false;
 
 async function refreshFromDisk() {
   if (isWatchingRefresh) return;
@@ -1886,13 +2221,43 @@ async function renderGitPane() {
       });
       return;
     }
+    const [branches, commits] = await Promise.all([
+      fsBridge.gitBranches().catch(() => []),
+      fsBridge.gitLog(10).catch(() => [])
+    ]);
+    const branchOpts = (branches.length ? branches : [st.branch || 'main'])
+      .map(b => `<option value="${escapeHtml(b)}" ${b === st.branch ? 'selected' : ''}>⎇ ${escapeHtml(b)}</option>`)
+      .join('');
     const listHtml = st.changes.length
-      ? st.changes.map(c => `<div class="git-row" data-file="${escapeHtml(c.path)}"><span>${escapeHtml(c.path)}</span><span class="git-code">${escapeHtml(c.code)}</span></div>`).join('')
+      ? st.changes.map(c => `<div class="git-row" data-file="${escapeHtml(c.path)}">
+          <span>${escapeHtml(c.path)}</span>
+          <span class="git-row-actions">
+            <button class="git-discard-btn" data-discard="${escapeHtml(c.path)}" title="Откатить изменения">↺</button>
+            <span class="git-code">${escapeHtml(c.code)}</span>
+          </span>
+        </div>`).join('')
       : '<div class="muted">Нет изменённых файлов.</div>';
-    pane.innerHTML = `<div class="muted">Ветка: <strong style="color:#fff">${escapeHtml(st.branch)}</strong></div>
+    const logHtml = commits.length
+      ? `<div class="git-log-box"><div class="muted" style="font-weight:600;">Последние коммиты</div>${commits.map(c => `<div>${escapeHtml(c)}</div>`).join('')}</div>`
+      : '';
+    pane.innerHTML = `<div class="git-branch-bar">
+        <select id="gitBranchSelect" title="Переключить ветку">${branchOpts}</select>
+        <button id="btnGitNewBranch" title="Создать ветку">+</button>
+      </div>
       <input id="gitCommitMsg" class="git-msg" type="text" placeholder="Сообщение коммита..." />
       <button id="btnGitCommit" class="primary full-btn">✓ Commit (${st.changes.length})</button>
-      <div>${listHtml}</div>`;
+      <div>${listHtml}</div>
+      ${logHtml}`;
+    el('gitBranchSelect')?.addEventListener('change', async (e) => {
+      try { await fsBridge.gitCheckout(e.target.value, false); renderGitPane(); await refreshFromDisk(); }
+      catch (err) { addLog(err.message || String(err), 'err'); }
+    });
+    el('btnGitNewBranch')?.addEventListener('click', async () => {
+      const b = prompt('Имя новой ветки:');
+      if (!b || !b.trim()) return;
+      try { await fsBridge.gitCheckout(b.trim(), true); renderGitPane(); }
+      catch (err) { addLog(err.message || String(err), 'err'); }
+    });
     el('btnGitCommit').addEventListener('click', async () => {
       try {
         const msg = el('gitCommitMsg').value;
@@ -1901,8 +2266,17 @@ async function renderGitPane() {
         renderGitPane();
       } catch (e) { addLog(e.message || String(e), 'err'); }
     });
+    pane.querySelectorAll('[data-discard]').forEach(btn => {
+      btn.addEventListener('click', async (ev) => {
+        ev.stopPropagation();
+        const rel = btn.dataset.discard;
+        if (!confirm(`Откатить изменения в "${rel}"?`)) return;
+        try { await fsBridge.gitDiscard(rel); await refreshFromDisk(); renderGitPane(); }
+        catch (err) { addLog(err.message || String(err), 'err'); }
+      });
+    });
     pane.querySelectorAll('.git-row').forEach(r => {
-      r.addEventListener('click', () => openFile(r.dataset.file));
+      r.addEventListener('click', () => openGitDiff(r.dataset.file));
     });
   } catch (err) {
     pane.innerHTML = `<div class="muted">${escapeHtml(err.message || String(err))}</div>`;
@@ -1930,11 +2304,12 @@ function switchSideView(view, forceOpen = false) {
     return;
   }
   state.activeView = view;
-  ['explorer', 'search', 'git', 'run', 'apis'].forEach(v => el(`view-${v}`).classList.toggle('hidden', v !== view));
+  ['explorer', 'search', 'git', 'run', 'apis', 'nexus'].forEach(v => el(`view-${v}`)?.classList.toggle('hidden', v !== view));
   toggleSidebar(true);
   if (view === 'search') el('searchFilesInput').focus();
   if (view === 'apis') el('searchApiInput').focus();
   if (view === 'git') renderGitPane();
+  if (view === 'nexus') refreshNexusRegistry();
 }
 
 document.querySelectorAll('.act-btn').forEach(btn => {
@@ -2539,7 +2914,126 @@ function renderEntityInspector(d) {
   });
 }
 
-window.addEventListener('message', (e) => {
+const registeredHotkeys = new Set();
+let lastPausedDebugInfo = null;
+state.breakpoints = [];
+
+function syncEditorBreakpoints() {
+  if (!editor || typeof editor.setBreakpoints !== 'function') return;
+  const f = state.activeFile;
+  const lines = (state.breakpoints || []).filter(b => b.file === f).map(b => b.line);
+  editor.setBreakpoints(lines);
+}
+
+function toggleBreakpoint(file, line) {
+  if (!file || !line) return;
+  const idx = state.breakpoints.findIndex(b => b.file === file && b.line === line);
+  if (idx >= 0) state.breakpoints.splice(idx, 1);
+  else state.breakpoints.push({ file, line });
+  syncEditorBreakpoints();
+  renderDebuggerStateBox();
+  try {
+    el('previewFrame')?.contentWindow?.postMessage({ type: 'roy-dbg-cmd', cmd: 'setBreakpoints', list: state.breakpoints }, '*');
+  } catch {}
+}
+
+function renderDebuggerStateBox() {
+  const box = el('debuggerStateBox');
+  if (!box) return;
+  const bps = state.breakpoints || [];
+  const bpHtml = bps.length
+    ? bps.map(b => `<div class="watch-row"><span class="watch-k">🔴 ${escapeHtml(b.file)}:${b.line}</span><button class="bc-btn" data-rmbp="${escapeHtml(b.file)}:${b.line}">✕</button></div>`).join('')
+    : '<div class="muted">Нет брейкпоинтов (клик по левому полю)</div>';
+  const stack = Array.isArray(lastPausedDebugInfo?.stack) ? lastPausedDebugInfo.stack : [];
+  const pausedTxt = lastPausedDebugInfo?.frame
+    ? `<div class="ba-warns">⏸ Пауза: ${escapeHtml(lastPausedDebugInfo.frame.file || 'main.roy')}:${lastPausedDebugInfo.frame.line || 1}</div>`
+    : '';
+  const stackHtml = stack.length
+    ? `<div class="dbg-col-title" style="margin-top:6px;">CALL STACK</div>` + stack.slice(-6).reverse().map(s => `<div class="muted">${escapeHtml(String(s.fn || s.name || s.loc || JSON.stringify(s)))}</div>`).join('')
+    : '';
+  box.innerHTML = pausedTxt + bpHtml + stackHtml;
+  box.querySelectorAll('[data-rmbp]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const [f, ln] = btn.dataset.rmbp.split(':');
+      toggleBreakpoint(f, Number(ln));
+    });
+  });
+}
+
+function mapErrorWithSourceMap(errData) {
+  if (!lastSourceMap || !Array.isArray(lastSourceMap.lines)) return errData;
+  const rawMsg = String(errData.raw || errData.message || '');
+  const m = /(?:<anonymous>|eval|Function)[^:]*:(\d+)(?::\d+)?/.exec(rawMsg);
+  if (!m) return errData;
+  const jsLine = Number(m[1]);
+  const entry = lastSourceMap.lines.find(row => row[0] === jsLine)
+    || lastSourceMap.lines.reduce((best, row) => (row[0] <= jsLine && (!best || row[0] > best[0])) ? row : best, null);
+  if (!entry) return errData;
+  const mappedFile = (lastSourceMap.files && lastSourceMap.files[entry[1]]) || errData.file || 'main.roy';
+  const mappedLine = entry[2] || errData.line || 1;
+  return { ...errData, file: mappedFile, line: mappedLine };
+}
+
+async function executeHostBridgeCall(cmd, payload = {}) {
+  if (cmd === 'fs:pickOpen') {
+    const p = await fsBridge.pickOpenFile();
+    return { ok: Boolean(p), path: p || null };
+  }
+  if (cmd === 'fs:pickSave') {
+    const p = await fsBridge.pickSaveFile(payload.defaultPath || 'file.txt', 'File', payload.ext || '*');
+    return { ok: Boolean(p), path: p || null };
+  }
+  if (cmd === 'clipboard:write') {
+    await navigator.clipboard.writeText(String(payload.text || ''));
+    return { ok: true };
+  }
+  if (cmd === 'clipboard:read') {
+    const text = await navigator.clipboard.readText();
+    return { ok: true, text };
+  }
+  if (cmd === 'hotkey:register') {
+    const combo = String(payload.combo || payload.key || '').toLowerCase();
+    if (combo) registeredHotkeys.add(combo);
+    return { ok: true, combo };
+  }
+  if (cmd === 'hotkey:unregister') {
+    const combo = String(payload.combo || payload.key || '').toLowerCase();
+    registeredHotkeys.delete(combo);
+    return { ok: true };
+  }
+  if (cmd === 'os:notify') {
+    const title = String(payload.title || 'RoyLang App');
+    const body = String(payload.body || payload.message || '');
+    addLog(`🔔 ${title}: ${body}`, 'info');
+    if (typeof Notification !== 'undefined') {
+      if (Notification.permission === 'granted') new Notification(title, { body });
+      else if (Notification.permission !== 'denied') Notification.requestPermission().then(p => { if (p === 'granted') new Notification(title, { body }); });
+    }
+    if (isTauriEnv()) await fsBridge.hostOsCall(cmd, payload).catch(() => {});
+    return { ok: true };
+  }
+  if (isTauriEnv()) {
+    return fsBridge.hostOsCall(cmd, payload);
+  }
+  return { ok: false, error: `Host command "${cmd}" requires Desktop mode` };
+}
+
+window.addEventListener('keydown', (e) => {
+  if (!registeredHotkeys.size) return;
+  const parts = [];
+  if (e.ctrlKey || e.metaKey) parts.push('ctrl');
+  if (e.shiftKey) parts.push('shift');
+  if (e.altKey) parts.push('alt');
+  parts.push(e.key.toLowerCase());
+  const combo = parts.join('+');
+  if (registeredHotkeys.has(combo) || registeredHotkeys.has(e.key.toLowerCase())) {
+    try {
+      el('previewFrame')?.contentWindow?.postMessage({ type: 'roy-host-event', event: 'hotkey', data: { combo } }, '*');
+    } catch {}
+  }
+});
+
+window.addEventListener('message', async (e) => {
   if (!e.data) return;
   if (e.data.__royLog) {
     addLog(e.data.text, e.data.kind);
@@ -2550,10 +3044,27 @@ window.addEventListener('message', (e) => {
     compileAndRun();
   } else if (e.data.type === 'roystudio-telemetry') {
     renderTelemetryToDebugPane(e.data);
+    updateProfilerPane(e.data);
   } else if (e.data.type === 'roystudio-inspector') {
     renderEntityInspector(e.data);
+  } else if (e.data.type === 'roystudio-dbg-pause') {
+    lastPausedDebugInfo = e.data;
+    renderDebuggerStateBox();
+    const f = e.data.frame?.file;
+    const ln = e.data.frame?.line;
+    if (f && state.textFiles[f] != null) openFile(f, ln || 1);
+    if (editor && typeof editor.setDebugCurrentLine === 'function' && ln) editor.setDebugCurrentLine(ln);
+    toggleBottomPanel(true);
+    document.querySelector('.btab[data-tab="debug"]')?.click();
+  } else if (e.data.type === 'roystudio-host-call') {
+    try {
+      const result = await executeHostBridgeCall(e.data.cmd, e.data.payload);
+      e.source?.postMessage({ type: 'roystudio-host-reply', id: e.data.id, result }, '*');
+    } catch (err) {
+      e.source?.postMessage({ type: 'roystudio-host-reply', id: e.data.id, error: err?.message || String(err) }, '*');
+    }
   } else if (e.data.type === 'roystudio-error') {
-    addCrashReport(e.data);
+    addCrashReport(mapErrorWithSourceMap(e.data));
   } else if (e.data.type === 'roystudio-eval-result') {
     if (e.data.ok) addLog(`<= ${typeof e.data.value === 'string' ? e.data.value : JSON.stringify(e.data.value)}`, 'info');
     else addLog(`<= Ошибка: ${e.data.error}`, 'err');
@@ -2572,7 +3083,167 @@ document.querySelectorAll('.btab').forEach(btn => {
     el('problemsPane').classList.toggle('hidden', btn.dataset.tab !== 'problems');
     el('consolePane').classList.toggle('hidden', btn.dataset.tab !== 'console');
     el('debugPane')?.classList.toggle('hidden', btn.dataset.tab !== 'debug');
+    el('profilerPane')?.classList.toggle('hidden', btn.dataset.tab !== 'profiler');
+    el('terminalPane')?.classList.toggle('hidden', btn.dataset.tab !== 'terminal');
+    if (btn.dataset.tab === 'terminal') el('termInput')?.focus();
   });
+});
+
+// === Live Profiler (120-frame graph) ===
+const profHistory = [];
+function updateProfilerPane(d) {
+  if (el('profFpsVal')) el('profFpsVal').textContent = String(Math.round(Number(d.fps) || 0));
+  if (el('profTotalVal')) el('profTotalVal').textContent = `${Number(d.prof?.total ?? d.frameMs ?? 0).toFixed(1)} ms`;
+  if (el('profEntVal')) el('profEntVal').textContent = String(d.entities ?? 0);
+  if (el('profPartVal')) el('profPartVal').textContent = String(d.particles ?? 0);
+  if (el('profHeapVal')) el('profHeapVal').textContent = d.heapMB != null ? `${d.heapMB} МБ` : '—';
+  if (el('profLoopVal')) el('profLoopVal').textContent = `${d.loopPct ?? 0}%`;
+
+  const p = d.prof || {};
+  if (el('profPhasesBar')) {
+    el('profPhasesBar').innerHTML = `
+      <span style="color:#38bdf8">Update: ${Number(p.update || 0).toFixed(2)}ms</span>
+      <span style="color:#34d399">Draw: ${Number(p.draw || 0).toFixed(2)}ms</span>
+      <span style="color:#fbbf24">Light: ${Number(p.light || 0).toFixed(2)}ms</span>
+      <span style="color:#e879f9">PostFX: ${Number(p.postfx || 0).toFixed(2)}ms</span>
+      <span style="color:#94a3b8">UI: ${Number(p.ui || 0).toFixed(2)}ms</span>
+    `;
+  }
+
+  profHistory.push({ fps: Number(d.fps) || 0, ms: Number(p.total ?? d.frameMs ?? 0) });
+  if (profHistory.length > 120) profHistory.shift();
+  const cv = el('profCanvas');
+  if (!cv || el('profilerPane')?.classList.contains('hidden')) return;
+  const ctx = cv.getContext('2d');
+  const w = cv.width, h = cv.height;
+  ctx.clearRect(0, 0, w, h);
+  ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+  ctx.beginPath(); ctx.moveTo(0, h - 16.6 * 2); ctx.lineTo(w, h - 16.6 * 2); ctx.stroke();
+  const bw = w / 120;
+  for (let i = 0; i < profHistory.length; i++) {
+    const it = profHistory[i];
+    const barH = Math.min(h - 2, Math.max(2, it.ms * 2));
+    ctx.fillStyle = it.ms > 18 ? '#f87171' : (it.ms > 12 ? '#fbbf24' : '#34d399');
+    ctx.fillRect(i * bw, h - barH, Math.max(1, bw - 1), barH);
+  }
+}
+
+// === Integrated Terminal ===
+const termHistory = [];
+let termHistIdx = 0;
+function appendTermLine(text, cls = 'info') {
+  const box = el('terminalLogs');
+  if (!box || !text) return;
+  const row = document.createElement('div');
+  row.className = `log-row ${cls}`;
+  row.textContent = text;
+  box.appendChild(row);
+  box.scrollTop = box.scrollHeight;
+}
+el('termInput')?.addEventListener('keydown', async (e) => {
+  const inp = e.target;
+  if (e.key === 'Enter') {
+    const cmd = inp.value.trim();
+    if (!cmd) return;
+    termHistory.push(cmd);
+    termHistIdx = termHistory.length;
+    inp.value = '';
+    if (cmd === 'cls' || cmd === 'clear') {
+      if (el('terminalLogs')) el('terminalLogs').innerHTML = '';
+      return;
+    }
+    appendTermLine(`$ ${cmd}`, 'warn');
+    try {
+      const res = await fsBridge.runTerminalCommand(cmd);
+      if (res.stdout) appendTermLine(res.stdout.trimEnd(), 'info');
+      if (res.stderr) appendTermLine(res.stderr.trimEnd(), 'err');
+      if (!res.stdout && !res.stderr) appendTermLine(`[exit ${res.code}]`, 'info');
+    } catch (err) {
+      appendTermLine(err.message || String(err), 'err');
+    }
+  } else if (e.key === 'ArrowUp') {
+    if (termHistIdx > 0) { termHistIdx--; inp.value = termHistory[termHistIdx] || ''; e.preventDefault(); }
+  } else if (e.key === 'ArrowDown') {
+    if (termHistIdx < termHistory.length - 1) { termHistIdx++; inp.value = termHistory[termHistIdx] || ''; }
+    else { termHistIdx = termHistory.length; inp.value = ''; }
+    e.preventDefault();
+  }
+});
+
+// === 2P Dual Preview & Pixel Art Tool ===
+el('btnPreview2P')?.addEventListener('click', () => {
+  const vp = el('previewViewport');
+  const f2 = el('previewFrame2');
+  const btn = el('btnPreview2P');
+  if (!vp || !f2) return;
+  const on = !vp.classList.contains('is-dual');
+  vp.classList.toggle('is-dual', on);
+  f2.classList.toggle('hidden', !on);
+  btn?.classList.toggle('is-active', on);
+  if (on) compileAndRun();
+});
+
+let pixelMounted = false;
+el('btnPixelTool')?.addEventListener('click', () => {
+  closeDiffViewer();
+  el('welcomeScreen')?.classList.add('hidden');
+  el('imageViewer')?.classList.add('hidden');
+  el('editorSplitWrap')?.classList.add('hidden');
+  el('uiDesignerViewer')?.classList.add('hidden');
+  el('cutsceneViewer')?.classList.add('hidden');
+  el('pixelViewer')?.classList.remove('hidden');
+  if (!pixelMounted && el('pixelHost')) {
+    mountPixelEditor(el('pixelHost'), { state, fsBridge, refreshFromDisk, addLog, openFile });
+    pixelMounted = true;
+  }
+  document.querySelector('.sb-lang').textContent = 'Пиксель-арт';
+});
+el('btnPixelClose')?.addEventListener('click', () => {
+  el('pixelViewer')?.classList.add('hidden');
+  if (state.activeFile) openFile(state.activeFile);
+  else el('editorSplitWrap')?.classList.remove('hidden');
+});
+
+let uiDesignerMounted = false;
+el('btnUiDesigner')?.addEventListener('click', () => {
+  closeDiffViewer();
+  el('welcomeScreen')?.classList.add('hidden');
+  el('imageViewer')?.classList.add('hidden');
+  el('editorSplitWrap')?.classList.add('hidden');
+  el('pixelViewer')?.classList.add('hidden');
+  el('cutsceneViewer')?.classList.add('hidden');
+  el('uiDesignerViewer')?.classList.remove('hidden');
+  if (!uiDesignerMounted && el('uiDesignerHost')) {
+    mountRoyUiDesigner(el('uiDesignerHost'), { state, fsBridge, refreshFromDisk, addLog, openFile });
+    uiDesignerMounted = true;
+  }
+  document.querySelector('.sb-lang').textContent = '.royui Designer';
+});
+el('btnUiDesignerClose')?.addEventListener('click', () => {
+  el('uiDesignerViewer')?.classList.add('hidden');
+  if (state.activeFile) openFile(state.activeFile);
+  else el('editorSplitWrap')?.classList.remove('hidden');
+});
+
+let cutsceneMounted = false;
+el('btnCutsceneTool')?.addEventListener('click', () => {
+  closeDiffViewer();
+  el('welcomeScreen')?.classList.add('hidden');
+  el('imageViewer')?.classList.add('hidden');
+  el('editorSplitWrap')?.classList.add('hidden');
+  el('pixelViewer')?.classList.add('hidden');
+  el('uiDesignerViewer')?.classList.add('hidden');
+  el('cutsceneViewer')?.classList.remove('hidden');
+  if (!cutsceneMounted && el('cutsceneHost')) {
+    mountCutsceneGraphEditor(el('cutsceneHost'), { state, fsBridge, refreshFromDisk, addLog, openFile });
+    cutsceneMounted = true;
+  }
+  document.querySelector('.sb-lang').textContent = 'Катсцена / Диалоги';
+});
+el('btnCutsceneClose')?.addEventListener('click', () => {
+  el('cutsceneViewer')?.classList.add('hidden');
+  if (state.activeFile) openFile(state.activeFile);
+  else el('editorSplitWrap')?.classList.remove('hidden');
 });
 el('btnClearLog').addEventListener('click', () => {
   state.logs = [];
@@ -2618,6 +3289,17 @@ document.querySelectorAll('#buildTargets .bld-tab').forEach(btn => {
     buildModalTarget = btn.dataset.target;
     syncBuildTargetUi();
   });
+});
+el('btnAndroidOpenProj')?.addEventListener('click', () => {
+  if (lastBuildDirPath) fsBridge.openInExplorer(lastBuildDirPath);
+});
+el('btnAndroidOpenApk')?.addEventListener('click', () => {
+  if (lastBuildDirPath) fsBridge.openInExplorer(lastBuildDirPath);
+});
+el('btnAndroidBuildPwa')?.addEventListener('click', () => {
+  buildModalTarget = 'pwa';
+  syncBuildTargetUi();
+  el('btnStartBuild')?.click();
 });
 el('btnPickOutDir').addEventListener('click', async () => {
   const picked = await fsBridge.pickDirectory('Выберите папку вывода сборки');
@@ -3206,8 +3888,6 @@ el('btnRunTests')?.addEventListener('click', () => {
   }
 });
 
-let secondaryEditor = null;
-let splitFilePath = null;
 function refreshSplitFileSelect() {
   const sel = el('splitFileSelect');
   if (!sel) return;
@@ -3428,9 +4108,72 @@ function startProjectFileWatcher() {
       }
     } catch {}
   };
-  setInterval(checkChanges, 3500);
+  setInterval(checkChanges, 1500);
   window.addEventListener('focus', checkChanges);
 }
+
+// === IDE Settings (Theme, Font Size, Format on Save, Default Engine) ===
+const SETTINGS_KEY = 'roystudio.settings.v1';
+let ideSettings = { theme: 'vs-dark', fontSize: 13, formatOnSave: false, defaultEngine: '__builtin__' };
+try {
+  const savedSet = JSON.parse(localStorage.getItem(SETTINGS_KEY) || 'null');
+  if (savedSet && typeof savedSet === 'object') ideSettings = { ...ideSettings, ...savedSet };
+} catch {}
+
+function applyIdeSettings(s) {
+  ideSettings = { ...ideSettings, ...s };
+  document.body.classList.remove('theme-midnight', 'theme-monokai', 'theme-light');
+  if (ideSettings.theme === 'midnight') document.body.classList.add('theme-midnight');
+  else if (ideSettings.theme === 'monokai') document.body.classList.add('theme-monokai');
+  else if (ideSettings.theme === 'hc-light') document.body.classList.add('theme-light');
+  if (editor) {
+    if (typeof editor.setTheme === 'function') editor.setTheme(ideSettings.theme === 'hc-light' ? 'vs' : 'vs-dark');
+    if (typeof editor.setFontSize === 'function') editor.setFontSize(ideSettings.fontSize);
+  }
+  try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(ideSettings)); } catch {}
+}
+
+function openSettingsModal() {
+  closeTopMenu();
+  el('setTheme').value = ideSettings.theme || 'vs-dark';
+  el('setFontSize').value = String(ideSettings.fontSize || 13);
+  el('setFormatOnSave').checked = Boolean(ideSettings.formatOnSave);
+  const engSel = el('setDefaultEngine');
+  if (engSel) {
+    const installedTags = Array.isArray(updState.installed?.versions) ? updState.installed.versions : [];
+    engSel.innerHTML = `<option value="__builtin__">Встроенная (v7.0 «Nexus»)</option>` +
+      installedTags.map(t => `<option value="${escapeHtml(t)}">${escapeHtml(t)}</option>`).join('');
+    engSel.value = ideSettings.defaultEngine || '__builtin__';
+  }
+  el('settingsModal')?.classList.remove('hidden');
+}
+
+el('btnOpenSettings')?.addEventListener('click', openSettingsModal);
+el('btnCloseSettings')?.addEventListener('click', () => el('settingsModal')?.classList.add('hidden'));
+el('settingsModal')?.addEventListener('click', (e) => { if (e.target === el('settingsModal')) el('settingsModal').classList.add('hidden'); });
+el('btnSaveSettings')?.addEventListener('click', async () => {
+  const next = {
+    theme: el('setTheme').value,
+    fontSize: Math.max(10, Math.min(26, Number(el('setFontSize').value) || 13)),
+    formatOnSave: Boolean(el('setFormatOnSave').checked),
+    defaultEngine: el('setDefaultEngine').value || '__builtin__'
+  };
+  applyIdeSettings(next);
+  if (isTauriEnv()) {
+    const wantTag = next.defaultEngine === '__builtin__' ? null : next.defaultEngine;
+    await fsBridge.setActiveEngine(wantTag).catch(() => {});
+    if (!wantTag) resetToBuiltin();
+    else {
+      try {
+        const bundle = await fsBridge.readInstalledEngine(wantTag);
+        await loadEngineFromBundle(wantTag, bundle.roylang_js, bundle.roylang_docs_js);
+      } catch {}
+    }
+    syncEngineBadges();
+  }
+  el('settingsModal')?.classList.add('hidden');
+  addLog('Настройки IDE сохранены', 'info');
+});
 
 async function boot() {
   updState.appVersion = await fsBridge.getAppVersion().catch(() => '1.1.0');
@@ -3485,7 +4228,211 @@ async function boot() {
     onSave: saveActiveFile,
     onRun: compileAndRun,
     onCursor: (ln, col) => { el('sbCursor').textContent = `Стр ${ln}, Стб ${col}`; },
-    onCmdPalette: () => openCmdPalette('all')
+    onCmdPalette: () => openCmdPalette('all'),
+    onToggleBreakpoint: (ln) => toggleBreakpoint(state.activeFile, ln)
+  });
+  applyIdeSettings(ideSettings);
+
+  // Step Debugger toolbar
+  el('dbgStepContinue')?.addEventListener('click', () => {
+    lastPausedDebugInfo = null;
+    if (editor && typeof editor.setDebugCurrentLine === 'function') editor.setDebugCurrentLine(null);
+    renderDebuggerStateBox();
+    el('previewFrame')?.contentWindow?.postMessage({ type: 'roy-dbg-cmd', cmd: 'resume' }, '*');
+  });
+  el('dbgStepOver')?.addEventListener('click', () => {
+    el('previewFrame')?.contentWindow?.postMessage({ type: 'roy-dbg-cmd', cmd: 'stepOver' }, '*');
+  });
+  el('dbgStepInto')?.addEventListener('click', () => {
+    el('previewFrame')?.contentWindow?.postMessage({ type: 'roy-dbg-cmd', cmd: 'stepInto' }, '*');
+  });
+  el('dbgClearBps')?.addEventListener('click', () => {
+    state.breakpoints = [];
+    syncEditorBreakpoints();
+    renderDebuggerStateBox();
+    el('previewFrame')?.contentWindow?.postMessage({ type: 'roy-dbg-cmd', cmd: 'setBreakpoints', list: [] }, '*');
+  });
+
+  // Nexus Package Manager
+  let nexusPackagesCache = [];
+  async function renderNexusList(filter = '') {
+    const box = el('nexusList');
+    if (!box) return;
+    const q = filter.trim().toLowerCase();
+    const list = q
+      ? (typeof RoyLang.nexus?.searchRegistry === 'function' ? RoyLang.nexus.searchRegistry(nexusPackagesCache, q) : nexusPackagesCache.filter(p => JSON.stringify(p).toLowerCase().includes(q)))
+      : nexusPackagesCache;
+    if (!list.length) {
+      box.innerHTML = '<div class="muted pad-msg">Пакеты не найдены. Нажмите +pkg для создания локального пакета.</div>';
+      return;
+    }
+    box.innerHTML = list.slice(0, 40).map((pkg, idx) => {
+      const pkgName = pkg.name || pkg.id || 'package';
+      const installed = Boolean(state.textFiles[`roy_packages/${pkgName}/roypkg.json`]);
+      return `
+      <div class="nexus-card">
+        <div class="nexus-card-head">
+          <strong>${escapeHtml(pkgName)}</strong>
+          <span class="muted">v${escapeHtml(pkg.version || '1.0.0')}</span>
+        </div>
+        <div class="nexus-card-desc">${escapeHtml(pkg.description || '')}</div>
+        <div class="nexus-card-foot">
+          <span class="muted">${escapeHtml(pkg.author || '')}</span>
+          <button data-nidx="${idx}" class="${installed ? '' : 'primary'}">${installed ? '✓ Установлен' : 'Установить'}</button>
+        </div>
+      </div>`;
+    }).join('');
+    box.querySelectorAll('[data-nidx]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const pkg = list[Number(btn.dataset.nidx)];
+        if (!pkg) return;
+        const pkgName = pkg.name || pkg.id || 'package';
+        const pkgDir = `roy_packages/${pkgName}`;
+        const prevText = btn.textContent;
+        const stEl = el('nexusStatus');
+        const setNxStatus = (msg, color = 'var(--muted)') => {
+          if (!stEl) return;
+          stEl.style.display = msg ? 'block' : 'none';
+          stEl.style.color = color;
+          stEl.textContent = msg;
+        };
+        btn.disabled = true;
+        btn.textContent = '⏳ Установка...';
+        setNxStatus(`⏳ Скачивание ${pkgName}...`, 'var(--blue-hi)');
+        try {
+          const urls = [pkg.roypkgUrl, pkg.fallbackUrl].filter(Boolean);
+          let bytes = null;
+          let lastErr = null;
+          for (const url of urls) {
+            try {
+              const res = await fetch(url);
+              if (!res.ok) throw new Error(`HTTP ${res.status}`);
+              bytes = new Uint8Array(await res.arrayBuffer());
+              break;
+            } catch (e) {
+              lastErr = e;
+            }
+          }
+          const writeTarget = async (rel, content) => {
+            await fsBridge.writeFile(rel, content);
+            if (typeof content === 'string') {
+              state.textFiles[rel] = content;
+              if (!state.allFiles.includes(rel)) state.allFiles.push(rel);
+            }
+          };
+          let fileCount = 0;
+          if (bytes && typeof RoyLang.nexus?.unpack === 'function') {
+            const unpacked = await RoyLang.nexus.unpack(bytes);
+            const files = unpacked?.files || {};
+            for (const [rel, entry] of Object.entries(files)) {
+              const content = entry && typeof entry === 'object' && 'content' in entry ? entry.content : entry;
+              const str = typeof content === 'string' ? content : (content instanceof Uint8Array ? '' : JSON.stringify(content, null, 2));
+              if (typeof content === 'string' || !(content instanceof Uint8Array)) {
+                await writeTarget(`${pkgDir}/${rel}`, str);
+                fileCount++;
+              }
+            }
+            if (unpacked?.lockEntry) {
+              let lock = { lockfileVersion: 1, packages: {} };
+              try {
+                if (state.textFiles['roypkg-lock.json']) lock = JSON.parse(state.textFiles['roypkg-lock.json']);
+              } catch {}
+              lock.packages = lock.packages || {};
+              lock.packages[pkgName] = unpacked.lockEntry;
+              await writeTarget('roypkg-lock.json', JSON.stringify(lock, null, 2));
+            }
+          } else {
+            if (lastErr && urls.length) throw lastErr;
+            await writeTarget(`${pkgDir}/roypkg.json`, JSON.stringify(pkg, null, 2));
+            fileCount = 1;
+          }
+          state.allFiles.sort();
+          renderTree();
+          btn.textContent = '✓ Установлен';
+          btn.classList.remove('primary');
+          setNxStatus(`✓ Установлен ${pkgName} -> ${pkgDir} (${fileCount} файлов)`, 'var(--ok)');
+          addLog(`Nexus: установлен пакет ${pkgName} -> ${pkgDir} (${fileCount} файлов)`, 'info');
+        } catch (err) {
+          btn.textContent = prevText;
+          setNxStatus(`✖ Ошибка ${pkgName}: ${err.message || err}`, 'var(--err)');
+          addLog(`Nexus ошибка установки ${pkgName}: ${err.message || err}`, 'err');
+        } finally {
+          btn.disabled = false;
+        }
+      });
+    });
+  }
+  window.refreshNexusRegistry = async function refreshNexusRegistry() {
+    const box = el('nexusList');
+    if (!RoyLang.nexus) return;
+    if (box && !nexusPackagesCache.length) box.innerHTML = '<div class="muted pad-msg">Загрузка реестра Nexus...</div>';
+    try {
+      const reg = await RoyLang.nexus.fetchRegistry();
+      nexusPackagesCache = Array.isArray(reg?.packages) ? reg.packages : (Array.isArray(reg) ? reg : []);
+      renderNexusList(el('searchNexusInput')?.value || '');
+    } catch (err) {
+      if (box) box.innerHTML = `<div class="muted pad-msg">Реестр недоступен оффлайн (${escapeHtml(err.message || String(err))}). Используйте Pack/Unpack .roypkg.</div>`;
+    }
+  };
+  el('btnNexusRefresh')?.addEventListener('click', () => window.refreshNexusRegistry());
+  el('searchNexusInput')?.addEventListener('input', (e) => renderNexusList(e.target.value));
+  el('btnNexusNewPkg')?.addEventListener('click', async () => {
+    if (!RoyLang.nexus?.generateTemplate) return;
+    const pkgName = prompt('Имя пакета (@author/name):', '@dev/my-pkg');
+    if (!pkgName) return;
+    const tpl = RoyLang.nexus.generateTemplate({ name: pkgName, author: 'dev', type: 'lib' });
+    const dir = `packages/${pkgName.replace(/^@/, '').replace('/', '_')}`;
+    const files = tpl?.files || { 'roypkg.json': JSON.stringify(tpl, null, 2) };
+    for (const [f, content] of Object.entries(files)) {
+      const rel = `${dir}/${f}`;
+      const txt = typeof content === 'string' ? content : JSON.stringify(content, null, 2);
+      if (state.rootPath) await fsBridge.writeFile(rel, txt);
+      state.textFiles[rel] = txt;
+      if (!state.allFiles.includes(rel)) state.allFiles.push(rel);
+    }
+    state.allFiles.sort();
+    renderTree();
+    addLog(`Создан пакет Nexus: ${dir}`, 'info');
+  });
+  el('btnNexusPack')?.addEventListener('click', async () => {
+    if (!RoyLang.nexus?.pack) return;
+    try {
+      const pkgFiles = {};
+      for (const [k, v] of Object.entries(state.textFiles)) {
+        if (!/^(dist|node_modules|\.git)\//i.test(k)) pkgFiles[k] = v;
+      }
+      const res = await RoyLang.nexus.pack(pkgFiles);
+      const outName = `${(state.projectName || 'package').replace(/\s+/g, '_')}.roypkg`;
+      const payload = typeof res === 'string' ? res : JSON.stringify(res, null, 2);
+      if (state.rootPath) await fsBridge.writeFile(outName, payload);
+      state.textFiles[outName] = payload;
+      if (!state.allFiles.includes(outName)) state.allFiles.push(outName);
+      renderTree();
+      addLog(`Пакет упакован: ${outName}`, 'info');
+    } catch (err) {
+      addLog(`Ошибка упаковки .roypkg: ${err.message || err}`, 'err');
+    }
+  });
+  el('btnNexusUnpack')?.addEventListener('click', async () => {
+    if (!RoyLang.nexus?.unpack) return;
+    const pkgKey = Object.keys(state.textFiles).find(k => k.endsWith('.roypkg'));
+    if (!pkgKey) { addLog('В проекте нет .roypkg файла', 'warn'); return; }
+    try {
+      const raw = JSON.parse(state.textFiles[pkgKey]);
+      const unpacked = await RoyLang.nexus.unpack(raw);
+      const outFiles = unpacked?.files || unpacked || {};
+      for (const [rel, txt] of Object.entries(outFiles)) {
+        const dest = `packages/${pkgKey.replace(/\.roypkg$/i, '')}/${rel}`;
+        const str = typeof txt === 'string' ? txt : JSON.stringify(txt, null, 2);
+        if (state.rootPath) await fsBridge.writeFile(dest, str);
+        state.textFiles[dest] = str;
+        if (!state.allFiles.includes(dest)) state.allFiles.push(dest);
+      }
+      renderTree();
+      addLog(`Распакован ${pkgKey}`, 'info');
+    } catch (err) {
+      addLog(`Ошибка распаковки: ${err.message || err}`, 'err');
+    }
   });
 
   installDropHandlers();

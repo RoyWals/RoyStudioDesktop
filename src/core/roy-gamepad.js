@@ -1,4 +1,4 @@
-// Roy Touch Gamepad Controller v6.5 (generated bundle — edit src/gamepad/roy-gamepad.js)
+// Roy Touch Gamepad Controller v7.0 «Nexus» · Epoch Paragon (generated bundle — edit src/gamepad/roy-gamepad.js)
 
 // roylang/src/gamepad/roy-gamepad.js
 var KEY_DEFS = {

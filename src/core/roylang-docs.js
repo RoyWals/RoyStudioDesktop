@@ -1,13 +1,17 @@
-// RoyLang Docs, Index & Signature Metadata v6.9 «Zenith» (generated bundle — edit src/docs/index.js)
+// RoyLang Docs, Index & Signature Metadata v7.0 «Nexus» · Epoch Paragon (generated bundle — edit src/docs/index.js)
 
 // roylang/src/compiler/constants.js
-var VERSION = "v6.9";
-var CODENAME = "Zenith";
+var VERSION = "v7.0";
+var CODENAME = "Nexus";
+var EPOCH = "Paragon";
 var KEYWORDS = /* @__PURE__ */ new Set([
   "game",
   "entity",
   "class",
   "struct",
+  "interface",
+  "trait",
+  "implements",
   "extends",
   "super",
   "delete",
@@ -660,12 +664,20 @@ var KNOWN_RUNTIME_GLOBALS = /* @__PURE__ */ new Set([
   "keyRebind",
   "profiler",
   "debugOverlay",
-  // v6.6 «Vanguard» — Modular Pack: v66-3d
+  // v6.6 «Vanguard» / v7.0 «Nexus» — Modular Pack: v66-3d (WebGL2/WebGPU 3D v3 PBR, IBL, Instancing, LOD, Shadows, Skinning, PostFX, Terrain, Decals, 3D UI, 2.5D Pro, HD-2D)
   "scene3D",
+  "webgpuScene3D",
   "parseGLB",
   "loadGLTF",
   "fpsController3D",
   "voxelWorld3D",
+  "material3D",
+  "animator3D",
+  "worldTerrain3D",
+  "decal3D",
+  "ui3D",
+  "sectorWorld25D",
+  "hd2dScene",
   // v6.7 «Oracle» — Modular Pack: v67-core (ML Core, Tensors, Data, Classic ML)
   "tensor",
   "matrix",
@@ -788,12 +800,15 @@ var KNOWN_RUNTIME_GLOBALS = /* @__PURE__ */ new Set([
   "p2pRoom",
   "p2pHost",
   "p2pJoin",
-  // v6.9 «Zenith» — Modular Pack: v69-gpu (WebGL2 GLSL Shaders, 100k+ GPU Particles, 3D Raymarching)
+  // v6.9 «Zenith» / v7.0 «Nexus» — Modular Pack: v69-gpu (WebGL2 GLSL Shaders, 100k+ GPU Particles, GPU 2D Sprite Batcher, 3D Raymarching)
   "glslShader",
   "gpuParticles",
+  "gpuSpriteBatch",
   "raymarch3D",
-  // v6.9 «Zenith» — Modular Pack: v69-3d-world (3D Rigid-Body Physics, Vehicles, 3D A*, Skybox3D, Water3D)
+  // v6.9 «Zenith» / v7.0 «Nexus» — Modular Pack: v69-3d-world (3D Rigid-Body Physics + 3D Joints, 3D Ragdoll, 3D NavMesh, Vehicles, 3D A*, Skybox3D, Water3D)
   "physics3D",
+  "ragdoll3D",
+  "navMesh3D",
   "vehicle3D",
   "pathfind3D",
   "skybox3D",
@@ -821,6 +836,43 @@ var KNOWN_RUNTIME_GLOBALS = /* @__PURE__ */ new Set([
   "disjointSet",
   "lSystem",
   "svgPath",
+  // v7.0 «Nexus» (Epoch Paragon) — Package Ecosystem, Lifecycle Plugins, System Host Bridge, Debugger, OS Apps, UI 3.0 & 3D HRTF Audio (Core)
+  "hostCall",
+  "onHostEvent",
+  "registerHostBridge",
+  "osApp",
+  "royDebugger",
+  "pkgAsset",
+  "listPackages",
+  "getPackageInfo",
+  "textArea",
+  "flexBox",
+  "uiTable",
+  "treeView",
+  "colorPicker",
+  "contextMenu",
+  "splitPane",
+  "parseRoyUI",
+  "renderRoyUI",
+  "audio3D",
+  // v7.0 «Nexus» — Modular Pack: v70-apex (DAW/DSP/WAV, AR Vision Hand/Face/Marker, Mobile Sensors/Haptics/Touch, LagComp/Server, LipSync/3D Spline/Director)
+  "audioDSP",
+  "audioSampler",
+  "audioTracker",
+  "exportWav",
+  "handTrack",
+  "faceTrack",
+  "arMarker",
+  "motionSensors",
+  "haptics",
+  "touchControls",
+  "lagCompensator",
+  "serverRoom",
+  "matchmaker",
+  "antiCheat",
+  "lipSync",
+  "cameraSpline3D",
+  "directorTimeline",
   // Standard JS Host Builtins
   "Math",
   "Date",
@@ -846,13 +898,13 @@ var KNOWN_RUNTIME_GLOBALS = /* @__PURE__ */ new Set([
 // roylang/src/docs/index.js
 var ROY_DOCS_VERSION = VERSION;
 var ROY_DOCS_CODENAME = CODENAME;
-var ROY_DOCS_BRANCH = "Odyssey";
+var ROY_DOCS_BRANCH = EPOCH;
 var ROY_DOCS_BRANCHES = [
   { id: "genesis", range: "v1–v3", name: "Genesis", ru: "Зарождение", releases: ["v1 Spark", "v2 Canvas", "v3 Arcade"] },
   { id: "horizon", range: "v4", name: "Horizon", ru: "Горизонт", releases: ["v4 Horizon"] },
   { id: "lumen", range: "v5", name: "Lumen", ru: "Свет", releases: ["v5 Lumen"] },
   { id: "odyssey", range: "v6.0–v6.9", name: "Odyssey", ru: "Одиссея", releases: ["v6 Chronos", "v6.1 Puppeteer", "v6.2 Atlas", "v6.3 Mirage", "v6.4 Titan", "v6.5 Forge", "v6.6 Vanguard", "v6.7 Oracle", "v6.8 Prism", "v6.9 Zenith"] },
-  { id: "nexus", range: "v7.0", name: "Nexus", ru: "Экосистема (в планах)", releases: ["v7.0 Nexus"] }
+  { id: "paragon", range: "v7.0+", name: "Paragon", ru: "Эталон", releases: ["v7.0 Nexus"] }
 ];
 var ROY_KEYWORDS = Array.from(KEYWORDS);
 var ROY_RUNTIME_APIS = Array.from(KNOWN_RUNTIME_GLOBALS);
@@ -870,6 +922,7 @@ var ROY_DOCS_CATS = [
 ];
 var ROY_DOCS_VERSIONS = [
   { id: "all", label: "Все версии" },
+  { id: "v7.0", label: "v7.0 · Nexus", codename: "Nexus", branch: "Paragon" },
   { id: "v6.9", label: "v6.9 · Zenith", codename: "Zenith", branch: "Odyssey" },
   { id: "v6.8", label: "v6.8 · Prism", codename: "Prism", branch: "Odyssey" },
   { id: "v6.7", label: "v6.7 · Oracle", codename: "Oracle", branch: "Odyssey" },
@@ -885,6 +938,18 @@ var ROY_DOCS_VERSIONS = [
   { id: "v1-v3", label: "v1–v3 · Genesis", codename: "Genesis", branch: "Genesis" }
 ];
 var ROYLANG_V3_DOCS = [
+  { "cat": "syntax", "ver": "v7.0", "badge": "Мультитаргетный компилятор (v7.0)", "title": "Roblox Luau · Lua/LÖVE2D · Unity C# · Godot 4 · Authoritative Server · Native WASM", "desc": "Компилируйте один и тот же .roy код в 6 платформ: Roblox Luau (--!strict + Rojo), Lua 5.4 / LÖVE2D, Unity C#, Godot 4 GDScript, авторитетный Node.js мультиплеер-сервер (--target server: комнаты, тик-рейт, матчмейкинг, античит, KV-БД) и нативный бинарный WebAssembly (--target wasm: .wat + исполняемый .wasm + JS-мост) с условной компиляцией #if TARGET_* и таргет-линтером.", "code": "// CLI: roylang build main.roy --target server -o out-server\n// CLI: roylang build main.roy --target wasm -o out-wasm\n\nfn clampT<T>(v: T, lo: T, hi: T) -> T {\n  if v < lo { return lo }\n  if v > hi { return hi }\n  return v\n}\n\n#if TARGET_WASM\nfn stepOrbit(x: num, y: num, n: num) -> num {\n  let s = 0\n  for i in 0..n { s += sqrt(x * x + y * y) }\n  return s\n}\n#endif" },
+  { "cat": "syntax", "ver": "v7.0", "badge": "Язык, Контракты & LSP (v7.0)", "title": "interface · trait · implements · LSP (Go to Def / Rename / Quick-Fixes) · royDebugger", "desc": "Полноценные контракты и миксины: interface (проверка методов/полей в линтере и оператор is), trait (переиспользуемые реализации с полями по умолчанию через implements A, B), встроенный LSP-движок (RoyLang.lsp: goToDefinition, findReferences, renameSymbol, getQuickFixes) и пошаговый отладчик royDebugger с брейкпоинтами поверх Source Maps.", "code": "interface Damageable {\n  fn takeDamage(amount: num) -> num\n}\ntrait Regen {\n  let regenRate: num = 2\n  fn tickRegen() { this.hp += this.regenRate }\n}\nstruct Knight(hp: num) implements Damageable, Regen {\n  fn takeDamage(amount: num) -> num {\n    this.hp -= amount\n    return this.hp\n  }\n}\nlet k = Knight(100)\nlog(k is Damageable, k is Regen)" },
+  { "cat": "draw", "ver": "v7.0", "badge": "WebGPU & 3D v3 (v7.0)", "title": "webgpuScene3D · IBL · Instancing & LOD · physics3D Joints · ragdoll3D · navMesh3D", "desc": "3D третьего поколения: нативный WebGPU WGSL PBR-рендерер webgpuScene3D с автоматическим фоллбэком на WebGL2, IBL-отражения окружения (scene3D.setIBL), инстансинг тысяч мешей (addInstancedMesh), уровни детализации (addLOD), 3D-суставы в physics3D (addJoint), 10-костный 3D Ragdoll (ragdoll3D) и полигональный 3D NavMesh по склонам и этажам (navMesh3D).", "code": 'let s3 = webgpuScene3D({ ibl: "sunset" })\nlet trees = s3.addInstancedMesh("cone", { color: "#22c55e" }, [{ pos: [0, 0, -5] }, { pos: [4, 0, -8] }])\nlet w3 = physics3D({ gravity: -9.81 })\nlet rag = ragdoll3D(w3, { x: 0, y: 4, z: 0 })\nlet nav = navMesh3D()\nnav.addQuad([-10,0,-10], [10,0,-10], [10,0,10], [-10,0,10])\nlet route = nav.findPath([-8, 0, -8], [8, 0, 8])' },
+  { "cat": "sdk", "ver": "v7.0", "badge": "Desktop OS, Сеть 3.0 & Сервер (v7.0)", "title": "osApp (FS/Tray/Notify/Window/Hotkey) · p2pRoom Voice Chat · lagCompensator · serverRoom · matchmaker · antiCheat", "desc": "Кроссплатформенный мост для десктоп-приложений и утилит osApp (файлы, трей, уведомления ОС, окна, хоткеи, буфер обмена), голосовой WebRTC-чат прямо внутри p2pRoom (enableVoice/setVoiceMuted/setPeerVolume), откат хитбоксов для 3D-шутеров (lagCompensator) и готовый набор авторитетного мультиплеера (serverRoom, matchmaker, antiCheat).", "code": 'await osApp.notify("RoyLang", "Сборка готова!")\nawait osApp.hotkey.register("ctrl+shift+s", () => log("Быстрое сохранение"))\nlet lc = lagCompensator({ maxHistoryMs: 1000 })\nlc.record(1000, { p1: { x: 10, y: 0, z: 5, r: 1 } })\nlet hit = lc.raycastHit(1000, 120, { origin: [0,0,5], dir: [1,0,0] })\nlet mm = matchmaker({ roomSize: 2, maxSkillDiff: 150 })' },
+  { "cat": "sdk", "ver": "v7.0", "badge": "Мини-DAW & Audio DSP (v7.0)", "title": "audioDSP (EQ/Comp/Delay/Chorus/Dist) · audioSampler · audioTracker · exportWav", "desc": "Полноценный аудио-продакшн прямо в движке: цепочка DSP-эффектов (3-полосный EQ, компрессор, дилей, хорус, дисторшн), полифонический сэмплер с ADSR-огибающей (audioSampler), многодорожечный трекер-секвенсор с оффлайн-рендером (audioTracker) и бинарный экспорт 16-bit PCM RIFF/WAVE файлов (exportWav).", "code": 'let dsp = audioDSP({ eq: { low: 3, high: 2 }, delay: { time: 0.25, mix: 0.3 } })\nlet trk = audioTracker({ bpm: 128, steps: 16 })\ntrk.addTrack("lead", { wave: "sawtooth", pattern: ["C4", null, "E4", null, "G4", null, "B4", null] })\nlet pcm = trk.renderPCM(2, 44100)\nlet wav = exportWav(pcm, { sampleRate: 44100, filename: "track.wav" })' },
+  { "cat": "sdk", "ver": "v7.0", "badge": "AR Зрение, Мобилки & Режиссура 2.0 (v7.0)", "title": "handTrack · faceTrack · arMarker · motionSensors · haptics · touchControls · lipSync · cameraSpline3D · directorTimeline", "desc": "Компьютерное зрение без внешних SDK (распознавание жестов кисти handTrack, положения головы/моргания faceTrack и 4×4 AR-маркеров arMarker), мобильные сенсоры (гироскоп/акселерометр motionSensors, виброотклик haptics, адаптивный тач-HUD touchControls) и режиссура катсцен 2.0 (липсинк lipSync, 3D-камера по сплайну cameraSpline3D, таймлайн directorTimeline с .royson экспортом).", "code": 'let marker = arMarker().generate(7)\nlet sens = motionSensors()\nlet pad = touchControls({ layout: "twinstick" })\nlet camPath = cameraSpline3D({ points: [[0,2,10], [5,4,4], [0,2,-8]], lookAt: [0,1,0] })\nlet mouth = lipSync({ text: "Привет, космос!" })\nlet cut = directorTimeline({ duration: 6 }).addTrack("cam", [{ t: 0, v: 0 }, { t: 6, v: 1 }])' },
+  { "cat": "sdk", "ver": "v7.0", "badge": "Экосистема Nexus (v7.0)", "title": "Пакеты @author/pkg · Плагины с 11 хуками · System/OS Host Bridge", "desc": 'Полноценная экосистема пакетов и плагинов Nexus: манифест roypkg.json, импорт import "@author/pkg" и подпутей, 11 хуков жизненного цикла плагина (onInit, onStart, onBeforeUpdate, onAfterUpdate, onBeforeDraw, onAfterDraw, onDrawUi, onInput, onResize, onSceneChange, onDestroy), ассеты пакетов (pkgAsset, listPackages, getPackageInfo) и универсальный системный мост для Desktop/Linux/RoyOS (registerHostBridge, hostCall, onHostEvent).', "code": 'import { pingOs } from "@royos/sys"\nimport fxCode from "@royos/sys/assets/fx.glsl"\n\nregisterHostBridge("sys", {\n  uname: () => "RoyOS 1.0 Linux"\n})\n\non start {\n  let os = await hostCall("sys:uname")\n  let banner = pkgAsset("@royos/sys", "banner.txt")\n  log(os, banner, listPackages())\n}' },
+  { "cat": "syntax", "ver": "v7.0", "badge": "Компилятор 7.0 (Paragon)", "title": "Дженерики <T> · Вывод типов при вызове · Точные Source Maps", "desc": "Обобщённые функции, структуры, классы, сущности и псевдонимы типов (fn clamp<T>, struct Box<T>, class Stack<T>, type Pair<A, B>) с проверкой несовместимости типов в линтере, текстовый импорт .glsl/.svg/.txt и точные Source Maps, сопоставляющие каждую ошибку в релизной сборке с исходным файлом и строкой .roy.", "code": "type Pair<A, B> = { first: A, second: B }\n\nstruct Box<T>(value: T) {\n  fn getVal() -> T => this.value\n}\n\nfn pickFirst<T>(a: T, b: T) -> T {\n  return a\n}\n\nlet b = Box(42)\nlet x = pickFirst(10, 20)" },
+  { "cat": "draw", "ver": "v7.0", "badge": "WebGL2 3D v2 (v7.0)", "title": "material3D (PBR) · Shadow Mapping · animator3D (GLB) · 3D PostFX · worldTerrain3D · decal3D · ui3D", "desc": "WebGL2 3D второго поколения: PBR-материалы (metallic, roughness, normalMap, emissive, toon), мягкие PCF-тени (scene3D.enableShadows), 3D PostFX-пайплайн (Bloom, DoF, SSAO, Toon), скелетный GLB-аниматор со SLERP и кроссфейдом (animator3D), 4-слойный террейн со скульптингом (worldTerrain3D), проекционные 3D-декали (decal3D) и мировой 3D-UI над головами (ui3D).", "code": 'let s3 = scene3D({ fog: true })\ns3.enableShadows({ resolution: 1024, pcf: true })\ns3.setPostFX({ bloom: 0.45, ssao: 0.3, dof: { focus: 12 } })\nlet steel = material3D({ color: "#94a3b8", metallic: 0.85, roughness: 0.25 })\nlet land = worldTerrain3D(s3, { width: 64, depth: 64, heightScale: 6 })\nlet decals = decal3D(s3, { maxDecals: 128 })\nlet hud3 = ui3D(s3)\n\non update(dt) {\n  s3.render()\n  hud3.draw()\n}' },
+  { "cat": "draw", "ver": "v7.0", "badge": "2.5D Pro & HD-2D (v7.0)", "title": "sectorWorld25D (DOOM/Build) · hd2dScene (Octopath HD-2D)", "desc": "Два фирменных режима объёмной графики: sectorWorld25D — полноценный секторный 2.5D-движок с разной высотой пола/потолка, лестницами, 3D-мостами, прыжками, цветным светом, дырками от пуль и 8-сторонними спрайтами; hd2dScene — режим HD-2D в стиле Octopath Traveler с пиксель-арт 2D-спрайтами внутри WebGL2 3D, тенями, факелами, DoF-боке и Bloom.", "code": '// 1) Секторный 2.5D Pro\nlet w = sectorWorld25D()\nlet hall = w.addRoom({ x: 0, z: 0, w: 12, d: 12, floorY: 0, ceilY: 4 })\nw.addStairs(hall, { x: 4, z: 2, steps: 6, toY: 2 })\n\n// 2) HD-2D WebGL2\nlet hd = hd2dScene({ preset: "sunset" })\nlet hero = hd.addSprite2D("hero", 0, 0, 0, { billboard: true })\nhd.addTorch(2, 1.2, 0, { color: "#fb923c" })\non draw => hd.render()' },
+  { "cat": "draw", "ver": "v7.0", "badge": "UI 3.0 & .royui (v7.0)", "title": "flexBox · textArea · uiTable · treeView · colorPicker · contextMenu · splitPane · .royui", "desc": "Полноценный десктопный UI 3.0 прямо на холсте: настоящий Flexbox-лейаут, многострочный редактор textArea, выделение мышью/Shift и Ctrl+A/C/X/V в textInput, сортируемые таблицы uiTable, иерархическое дерево treeView, HSV colorPicker, ПКМ-меню contextMenu, перетаскиваемые панели splitPane и декларативная разметка parseRoyUI / renderRoyUI (.royui) с подстановкой {{var}}.", "code": 'let uiSrc = """\npanel "Инспектор" {\n  flex dir="col" gap=8 {\n    label "Игрок: {{name}}"\n    button id="save" text="Сохранить"\n  }\n}\n"""\nlet uiTree = parseRoyUI(uiSrc)\n\non drawUi {\n  let res = renderRoyUI(uiTree, { x: 16, y: 16, w: 260, h: 180, data: { name: "Roy" } })\n  if res.actions.save { log("Сохранено!") }\n}' },
+  { "cat": "sdk", "ver": "v7.0", "badge": "GPU Batcher & 3D Audio (v7.0)", "title": "gpuSpriteBatch (65k+ спрайтов) · audio3D (HRTF + Доплер)", "desc": "Аппаратное ускорение 2D и кинематографический звук: gpuSpriteBatch рисует 10 000–65 000+ спрайтов за один проход через WebGL2 VBO на 60 FPS (tint, поворот, additive, спрайт-атласы), а audio3D даёт настоящее 3D HRTF-позиционирование поверх Web Audio PannerNode с ориентацией слушателя, синхронизацией с 3D/2.5D-камерой и эффектом Доплера.", "code": 'let batch = gpuSpriteBatch({ maxSprites: 20000, pixelated: true })\nlet snd3 = audio3D({ panningModel: "HRTF", refDistance: 2, maxDistance: 60 })\n\non update(dt) {\n  snd3.setListener(player.x, 1.6, player.z, Math.sin(player.yaw), 0, -Math.cos(player.yaw))\n}\non draw {\n  batch.begin()\n  for b in bullets { batch.draw(bulletImg, b.x, b.y, 16, 16, { rot: b.ang }) }\n  batch.end()\n}' },
   { "cat": "draw", "ver": "v6.9", "badge": "WebGL2 GPU & Шейдеры (v6.9)", "title": "glslShader · gpuParticles (100k+) · raymarch3D — реальный GPU-движок", "desc": "Настоящие пользовательские GLSL-шейдеры в 1 строку (glslShader с u_time/u_resolution/u_mouse/u_tex), аппаратные GPU-частицы на 100 000+ точек с аттракторами и вихрями (gpuParticles) и 3D SDF Raymarching на WebGL2 с пресетами mandelbulb, infiniteTunnel, crystalCave, torusKnot и мягкими тенями (raymarch3D).", "code": 'let sh = glslShader("fragColor = vec4(0.5 + 0.5*cos(u_time + uv.xyx + vec3(0,2,4)), 1.0);")\nlet gp = gpuParticles(100000, { gravity: 40 })\ngp.addAttractor(400, 250, 900, 120)\nlet rm = raymarch3D("mandelbulb")\n\non update(dt) { gp.emit(mouse.x, mouse.y, 120); gp.update(dt); rm.orbit(now() * 0.5) }\non draw { rm.draw(0, 0, 800, 500); gp.draw() }' },
   { "cat": "physics", "ver": "v6.9", "badge": "Живой 3D-мир & Физика (v6.9)", "title": "physics3D · vehicle3D · pathfind3D · skybox3D · water3D", "desc": "Полноценный 3D-физический движок твёрдых тел со сферами, коробками, плоскостями, трением, импульсами и 3D-рейкастом (physics3D), аркадно-физичная 3D-машина/дрифт/ховеркрафт с подвеской (vehicle3D), 3D A* поиск пути по этажам и вокселям (pathfind3D), процедурное небо со сменой дня/ночи и облаками (skybox3D) и анимированный океан волн Герстнера с плавучестью (water3D).", "code": 'let w3 = physics3D({ gravity: -9.81 })\nw3.addPlane(0)\nlet ball = w3.addSphere(0, 6, 0, 0.5, { restitution: 0.75 })\nlet car = vehicle3D(w3, { mode: "drift", y: 1.0 })\nlet sky = skybox3D().setTimeOfDay(17.5)\nlet sea = water3D({ amplitude: 0.6 })\n\non update(dt) { w3.step(dt); car.update(dt); sky.update(dt); sea.update(dt) }\non draw { sky.draw(car.yaw); sea.draw({ x: car.x, z: car.z }) }' },
   { "cat": "sdk", "ver": "v6.9", "badge": "Голос, MIDI & Веб-камера (v6.9)", "title": "speechSynth · voiceControl · midiInput · parseMIDI · motionTrack", "desc": "Иммерсивный ввод и озвучка без единой зависимости: голосовой синтезатор речи NPC (speechSynth), управление игрой голосовыми командами (voiceControl), подключение настоящих MIDI-клавиатур (midiInput), бинарный парсер .mid файлов SMF (parseMIDI) и оптический трекинг движения руками перед веб-камерой (motionTrack).", "code": 'let tts = speechSynth({ lang: "ru-RU", rate: 1.1 })\ntts.speak("Добро пожаловать на арену!")\nlet vc = voiceControl({ "прыжок": () => playerJump(), "щит": () => activateShield() })\nvc.start()\nlet midi = midiInput()\nmidi.onNoteOn((e) => tone(e.freq, 0.3, "sawtooth", e.velocity))\nlet cam = motionTrack()\n// await cam.start() -> cam.update(), cam.zones(3, 3), cam.centroid()' },
@@ -1770,6 +1835,30 @@ var ROYLANG_V3_DOCS = [
     title: "saveState/loadState · watch/tweak · sim.monteCarlo · leakWatch · debugLayers · stepFrame/slowMo · crashReport · desktop",
     desc: "Мгновенные RAM сейв-стейты (Shift+F5 / Shift+F9), живые панели watch()/tweak() с синхронизацией в IDE, headless-симулятор sim.run() и балансировщик sim.monteCarlo(1000, fn), детектор утечек leakWatch(), слои отладки debugLayers(), покадровый шаг, 60-кадровый crash-дайджест, Hot-Code Swap и нативный мост desktop.* для RoyStudio Desktop.",
     code: 'watch("HP", () => player.hp)\nlet spd = tweak("Speed", 260, 100, 600, 10)\nlet stats = sim.monteCarlo(500, () => fightSim(), { seed: 42 })\nif desktop.isDesktop { desktop.setTitle("Boss Fight") }'
+  },
+  {
+    ver: "v7.0",
+    cat: "draw",
+    badge: "Настоящее WebGL2 3D v2: PBR, Тени, Скиннинг и Постпроцессинг (v7.0)",
+    title: "scene3D v2 · material3D · animator3D · worldTerrain3D · decal3D · ui3D",
+    desc: "Полный скачок 3D-движка RoyLang: физически корректные PBR-материалы (metallic, roughness, Normal/Emissive карты, отражения неба IBL), настоящие 3D-тени Shadow Mapping (PCF), скелетная 3D-анимация .glb со скиннингом и кроссфейд-блендингом клипов, 3D-постпроцессинг (Bloom, Depth of Field, SSAO, Toon-шейдинг), мультитекстурный WebGL2-террейн со скульптингом, 3D-декали на поверхностях и 3D-UI над головами персонажей.",
+    code: 'let s3 = scene3D({ shadows: true, postFX: { bloom: 0.7, dof: true, focusDist: 12, ssao: 0.45 } })\nlet steel = material3D({ color: "#94a3b8", metallic: 0.85, roughness: 0.22, normalMap: true })\nlet terr = worldTerrain3D(s3, { width: 80, depth: 80, heightScale: 9 })\nlet decals = decal3D(s3)\ndecals.stamp([0, terr.heightAt(0, 0), 0], terr.normalAt(0, 0), { preset: "scorch", size: 2.2 })\nlet hud3 = ui3D(s3)\nhud3.add([0, 2, 0], { text: "Boss", hp: 80, maxHp: 100 })'
+  },
+  {
+    ver: "v7.0",
+    cat: "draw",
+    badge: "2.5D Pro Секторный движок и режим HD-2D (v7.0)",
+    title: "sectorWorld25D · hd2dScene",
+    desc: "Секторный 2.5D-движок уровня Doom/Build: разная высота пола и потолка в каждом секторе, лестницы addStairs(), настоящие 3D-мосты addBridge() (можно ходить над и под ними), прыжки, динамический цветной свет секторов, дырки от пуль на стенах (fireHitscan) и 8-сторонние спрайты врагов. Плюс режим HD-2D (hd2dScene) — пиксель-арт спрайты внутри WebGL2 3D с реальными тенями, размытием фона DoF, Bloom и мерцающими факелами.",
+    code: 'let w25 = sectorWorld25D()\nw25.addRoom(0, 0, 8, 8, { floorH: 0, ceilH: 4, lightColor: "#38bdf8", lightMode: "pulse" })\nw25.addStairs({ x: 8, y: 2, width: 3, length: 6, steps: 6, fromFloor: 0, toFloor: 2.4 })\nw25.addBridge({ x: 2, y: 2, w: 4, d: 2, topH: 2.2 })\nlet hd = hd2dScene({ preset: "sunset" })\nlet hero = hd.addSprite2D({ x: 0, y: 0, z: 0 })\nhd.addTorch(2, 0, -2); hd.follow(hero)'
+  },
+  {
+    ver: "v7.0",
+    cat: "draw",
+    badge: "UI 3.0 · WebGL2 GPU 2D-батчер · 3D HRTF-звук (v7.0)",
+    title: "textArea · flexBox · uiTable · treeView · colorPicker · contextMenu · splitPane · .royui · gpuSpriteBatch · audio3D",
+    desc: "Полный UI 3.0 (выделение мышью/Shift и Ctrl+C/V/X/A в textInput и многострочном textArea, настоящий Flexbox с justify/align/wrap/grow, сортируемые таблицы uiTable, дерево treeView, HSV colorPicker, ПКМ-меню contextMenu, разделитель splitPane и декларативный формат .royui), аппаратный WebGL2 2D-батчер на десятки тысяч спрайтов на 60 FPS (gpuSpriteBatch) и настоящий 3D HRTF-звук с авто-синхронизацией камеры 3D/2.5D (audio3D).",
+    code: 'let batch = gpuSpriteBatch({ maxSprites: 32000 })\nlet snd3 = audio3D({ refDistance: 2, maxDistance: 50 })\nlet uiTree = parseRoyUI("flex(dir: \\"row\\", gap: 10) { panel(grow: 1) { label(\\"HP: {{hp}}\\") } }")\non draw {\n  batch.begin()\n  for i in 0..5000 { batch.draw(i % 800, (i * 7) % 500, 12, 12, { color: "#38bdf8" }) }\n  batch.end()\n  renderRoyUI(uiTree, { x: 20, y: 20, w: 400, h: 80, data: { hp: 100 } })\n}'
   }
 ];
 var ROY_SIGNATURE_HINTS = {
@@ -2318,7 +2407,53 @@ var ROY_SIGNATURE_HINTS = {
   lruCache: { params: ["maxSize?", "opts?"], tip: "O(1) LRU-кэш с вытеснением и опциональным TTL: .get(), .set(), .has(), .delete(), .keys(), .stats()" },
   disjointSet: { params: ["items?"], tip: "Система непересекающихся множеств (Union-Find DSU): .makeSet(), .find(), .union(), .connected(), .groupSize(), .groups()" },
   lSystem: { params: ["axiomOrPreset", "rules?", "opts?"], tip: 'Процедурные L-системы ("tree"|"fern"|"bush"|"dragon"|"koch"|"lightning") и черепашья графика: .generate(n), .toSegments(), .draw(x, y)' },
-  svgPath: { params: ["dString"], tip: "Парсер, измерение и морфинг векторных SVG-путей (M/L/H/V/C/Q/Z): .length, .pointAt(t), .tangentAt(t), .sample(n), .morph(other, t), .draw()" }
+  svgPath: { params: ["dString"], tip: "Парсер, измерение и морфинг векторных SVG-путей (M/L/H/V/C/Q/Z): .length, .pointAt(t), .tangentAt(t), .sample(n), .morph(other, t), .draw()" },
+  hostCall: { params: ["command", "payload?"], tip: 'Асинхронный вызов системной команды хоста/ОС (Desktop, Linux, RoyOS, Node или зарегистрированный мост): await hostCall("sys:uname", args)' },
+  onHostEvent: { params: ["eventName", "handler"], tip: "Подписка на системные события от хоста/ОС/плагина. Возвращает функцию отписки." },
+  registerHostBridge: { params: ["namespace", "handlers"], tip: 'Регистрация обработчиков системного моста для hostCall("namespace:cmd") (файлы, процессы, окна, устройства ОС).' },
+  pkgAsset: { params: ["pkgName", "relPath"], tip: "Получение встроенного ассета (текст, шейдер, изображение, JSON) из установленного Nexus-пакета @author/pkg." },
+  listPackages: { params: [], tip: "Возвращает список всех подключённых Nexus-пакетов проекта с именем, версией, типом и разрешениями." },
+  getPackageInfo: { params: ["pkgName"], tip: "Возвращает подробный манифест установленного Nexus-пакета (name, version, type, permissions, assets) или null." },
+  material3D: { params: ["opts"], tip: "PBR-материал для scene3D: { color, metallic, roughness, normalMap, emissive, emissiveMap, ao, toon, castShadow, receiveShadow }" },
+  animator3D: { params: ["parsedGltf", "opts?"], tip: "Скелетный 3D-аниматор .glb/.gltf с блендингом: .play(name, { fade, loop, speed }), .crossFade(), .update(dt), .getJointMatrices(), .skinPositions()" },
+  worldTerrain3D: { params: ["scene", "opts?"], tip: "WebGL2 3D-террейн с 4-слойным мультитекстурированием: .heightAt(x, z), .normalAt(x, z), .sculpt(x, z, r, delta), .flatten()" },
+  decal3D: { params: ["scene", "opts?"], tip: "3D-декали на поверхностях (пули, ожоги, трещины, руны): .stamp(pos, normal, { preset, size, life }), .update(dt), .clear()" },
+  ui3D: { params: ["scene", "opts?"], tip: "3D-UI в мировых координатах (полоски HP, имена, урон над головами): .add(target, opts), .popup(pos, text), .project(x, y, z), .draw()" },
+  sectorWorld25D: { params: ["opts?"], tip: "Секторный 2.5D-движок (Doom/Build): .addRoom(), .addSector(), .addStairs(), .addBridge(), .addSprite({ frames8 }), .setSectorLight(), .fireHitscan(), .movePlayer(), .render()" },
+  hd2dScene: { params: ["opts?"], tip: "Режим HD-2D в WebGL2 (Octopath style): .addSprite2D(), .addFloor(), .addBlock(), .addTorch(), .follow(hero), .setFocus(), .setTimeOfDay(), .update(dt), .render()" },
+  textArea: { params: ["id", "x", "y", "w", "h", "opts?"], tip: "Многострочный текстовый редактор с выделением мышью/Shift, Ctrl+A/C/X/V, номерами строк и скроллом." },
+  flexBox: { params: ["x", "y", "w", "h", "opts", "itemsOrFn"], tip: "Настоящий Flexbox-контейнер (dir, justify: start|center|end|between|around|evenly, align, wrap, gap, grow, shrink, basis)." },
+  uiTable: { params: ["id", "x", "y", "w", "h", "columns", "rows", "opts?"], tip: "Таблица данных с кликом по заголовку для сортировки (asc/desc), выбором строк и прокруткой." },
+  treeView: { params: ["id", "x", "y", "w", "h", "nodes", "opts?"], tip: "Иерархическое сворачиваемое дерево (сцена, файлы, узлы) с иконками, выбором и .toggle(id)." },
+  colorPicker: { params: ["id", "x", "y", "w", "h", "value?", "opts?"], tip: "Интерактивный HSV-выбор цвета: 2D-квадрат SV, шкала Hue и hex-превью." },
+  contextMenu: { params: ["id", "items", "opts?"], tip: "Контекстное ПКМ-меню с горячими клавишами, иконками, разделителями и авто-прижатием к экрану." },
+  splitPane: { params: ["id", "x", "y", "w", "h", "opts?", "fnA?", "fnB?"], tip: "Контейнер с перетаскиваемым разделителем (horizontal/vertical) и обрезкой панелей paneA/paneB." },
+  parseRoyUI: { params: ["src"], tip: "Парсит декларативную разметку .royui (flex/panel/label/button/input/slider/toggle/spacer) в дерево UI." },
+  renderRoyUI: { params: ["treeOrSrc", "opts?"], tip: "Рендерит дерево или строку .royui с подстановкой {{binding}} из opts.data и возвращает { actions, values }." },
+  gpuSpriteBatch: { params: ["opts?"], tip: "WebGL2 GPU 2D-батчер на десятки тысяч спрайтов @ 60 FPS: .begin(), .setTexture(), .draw(), .drawRegion(), .end(), .stats()" },
+  audio3D: { params: ["opts?"], tip: "Настоящий 3D HRTF-звук (Web Audio PannerNode): .setListener(), .syncCamera(scene3D|fps|sector), .computeSpatial(), .play(), .stopAll()" },
+  webgpuScene3D: { params: ["opts?"], tip: "WebGPU 3D PBR + IBL рендерер (WGSL + Depth Buffer) с авто-фоллбэком на WebGL2 scene3D: .setIBL(), .addBox(), .addInstancedMesh(), .addLOD(), .render()" },
+  ragdoll3D: { params: ["world3d", "xOrOpts?", "y?", "z?", "opts?"], tip: "9-костный 3D Ragdoll поверх physics3D суставов: .impulse() / .applyImpulse(), .getBones(), .getCenter(), .syncMeshes(map)" },
+  navMesh3D: { params: ["triangles?", "opts?"], tip: "Полигональный 3D NavMesh по мешам и склонам: .addTriangle(), .addQuad(), .build(), .projectPoint(), .sampleHeight(x, z), .findPath(start, goal)" },
+  osApp: { params: [], tip: "Кроссплатформенный мост десктоп-приложений и утилит: osApp.fs, osApp.tray, osApp.notify(), osApp.window, osApp.hotkey, osApp.clipboard" },
+  royDebugger: { params: [], tip: "Пошаговый отладчик RoyLang с брейкпоинтами поверх Source Maps: .setBreakpoint(file, line), .stepOver(), .stepInto(), .resume(), .onPause(), .getState()" },
+  audioDSP: { params: ["opts?"], tip: "Цепочка DSP-эффектов мини-DAW (3-полосный EQ, компрессор, дилей, хорус, дисторшн): .setEQ(), .setCompressor(), .setDelay(), .setChorus(), .setDistortion(), .processBuffer()" },
+  audioSampler: { params: ["opts?"], tip: "Полифонический сэмплер с пересчётом высоты тона и встроенными пресетами (kick/snare/hat/piano): .addSample(), .renderNote(), .trigger()" },
+  audioTracker: { params: ["opts?"], tip: "Многодорожечный трекер-секвенсор мини-DAW с оффлайн-рендером: .addTrack(name, inst, pattern), .setBpm(), .renderPCM(loops), .exportWav()" },
+  exportWav: { params: ["samplesOrChannels", "opts?"], tip: "Бинарный энкодер 16-bit PCM RIFF/WAVE (.wav): возвращает { bytes, byteLength, sampleRate, durationSec, toBlob(), download(name) }" },
+  handTrack: { params: ["opts?"], tip: 'Zero-SDK трекинг кисти, пальцев и жестов ("fist"|"point"|"peace"|"open") с веб-камеры: .start(), .update(), .analyzeFrame(), .state' },
+  faceTrack: { params: ["opts?"], tip: "Zero-SDK трекинг лица, поворота головы (yaw/pitch) и открытия рта: .start(), .update(), .analyzeFrame(), .state" },
+  arMarker: { params: ["opts?"], tip: "Генератор и детектор 4×4 фидуциальных AR-маркеров без внешних SDK: .generateMarkerImage(id), .detectFrame(img), .update(), .markers" },
+  motionSensors: { params: ["opts?"], tip: "Мобильные датчики: гироскоп (DeviceOrientation), акселерометр (DeviceMotion) и детектор встряхивания: .start(), .tiltX/.tiltY, .onShake(), .simulate()" },
+  haptics: { params: [], tip: 'Тактильная отдача мобильных устройств: haptics.impact("light"|"medium"|"heavy"), .notify("success"|"warn"|"error"), .selection(), .custom(pattern), .stop()' },
+  touchControls: { params: ["layout?", "opts?"], tip: 'Адаптивные сенсорные раскладки ("platformer"|"twinstick"|"racing"|"rpg"): .update(), .draw(), .axisX(), .axisY(), .aimX(), .aimY(), .pressed(btn)' },
+  lagCompensator: { params: ["opts?"], tip: "Откат хитбоксов (Lag Compensation) для 2D/3D-шутеров: .recordSnapshot(ts, entities), .sampleAt(ts), .rewindRayHit(ts, origin, dir)" },
+  serverRoom: { params: ["id?", "opts?"], tip: "Авторитетная мультиплеерная комната с валидацией входов и событиями: .join(), .leave(), .players(), .broadcast(), .on()" },
+  matchmaker: { params: ["opts?"], tip: "Матчмейкинг по рейтингу (MMR/ELO): .enqueue(id, rating), .dequeue(id), .match() -> [serverRoom], .queueSize" },
+  antiCheat: { params: ["opts?"], tip: "Античит-валидатор скорости и телепортов с системой страйков: .validateMove(id, pos, dt), .getStrikes(id), .reset(id)" },
+  lipSync: { params: ["opts?"], tip: "Синхронизатор визем губ (A/E/O/U/FV/MBP/rest) под речь и voiceBlip: .speak(text), .pulse(), .update(dt, amp?), .drawMouth(), .viseme" },
+  cameraSpline3D: { params: ["keyframes", "opts?"], tip: "Кинематографическая 3D-камера по сплайну Catmull-Rom: .play(), .pause(), .seek(), .sample(t), .update(dt, scene3D)" },
+  directorTimeline: { params: ["dataOrTracks?", "opts?"], tip: "Таймлайн режиссуры катсцен с дорожками клипов, событиями и RoySON I/O: .addTrack(), .on(), .play(), .update(dt), .toRoyson()" }
 };
 function resolveRoySignatureHint(textBeforeCursor) {
   const s = String(textBeforeCursor || "");
@@ -3103,7 +3238,90 @@ var ROY_DOCS_INDEX = [
   { "name": "lruCache", "kind": "Функция", "cat": "collections", "ver": "v6.9", "sig": "lruCache(maxSize?, { ttlMs }).get() / .set() / .has() / .stats()", "desc": "Кэш с политикой вытеснения Least Recently Used за O(1) и опциональным временем жизни записей (TTL)." },
   { "name": "disjointSet", "kind": "Функция", "cat": "collections", "ver": "v6.9", "sig": "disjointSet(items?).union(a, b) / .find(x) / .connected(a, b) / .groups()", "desc": "Структура Union-Find (СНМ) со сжатием путей и ранговой эвристикой для компонент связности, лабиринтов и графов." },
   { "name": "lSystem", "kind": "Функция", "cat": "draw", "ver": "v6.9", "sig": 'lSystem("tree"|"fern"|"dragon"|"koch"|"lightning").generate(n) / .toSegments() / .draw(x, y)', "desc": "Процедурные L-системы Линденмайера с черепашьей графикой для генерации деревьев, растений, фракталов и молний." },
-  { "name": "svgPath", "kind": "Функция", "cat": "draw", "ver": "v6.9", "sig": 'svgPath("M 0 0 L 100 0 C ...").length / .pointAt(t) / .tangentAt(t) / .morph(other, t) / .draw()', "desc": "Парсер, измерение длины, сэмплинг, плавный морфинг и отрисовка векторных SVG-путей (M/L/H/V/C/Q/Z)." }
+  { "name": "svgPath", "kind": "Функция", "cat": "draw", "ver": "v6.9", "sig": 'svgPath("M 0 0 L 100 0 C ...").length / .pointAt(t) / .tangentAt(t) / .morph(other, t) / .draw()', "desc": "Парсер, измерение длины, сэмплинг, плавный морфинг и отрисовка векторных SVG-путей (M/L/H/V/C/Q/Z)." },
+  { "name": "hostCall", "kind": "Функция", "cat": "sdk", "ver": "v7.0", "sig": 'await hostCall("ns:cmd", payload?)', "desc": "Асинхронный вызов нативной команды хоста/ОС (Desktop, Linux, RoyOS, Node или пользовательский мост) для системных плагинов." },
+  { "name": "onHostEvent", "kind": "Функция", "cat": "sdk", "ver": "v7.0", "sig": "onHostEvent(eventName, (payload) => ...) -> unsub", "desc": "Подписка на события от хоста, ОС или нативных драйверов. Возвращает функцию отписки." },
+  { "name": "registerHostBridge", "kind": "Функция", "cat": "sdk", "ver": "v7.0", "sig": "registerHostBridge(namespace, { cmd(payload) { ... } })", "desc": 'Регистрирует обработчики команд для hostCall("namespace:cmd") — основа системных плагинов и RoyOS.' },
+  { "name": "pkgAsset", "kind": "Функция", "cat": "assets", "ver": "v7.0", "sig": 'pkgAsset("@author/pkg", "assets/file.txt")', "desc": "Возвращает встроенный ресурс (текст, GLSL-шейдер, JSON, Data URL) из подключённого Nexus-пакета." },
+  { "name": "listPackages", "kind": "Функция", "cat": "sdk", "ver": "v7.0", "sig": "listPackages() -> [{ name, version, type, permissions }]", "desc": "Возвращает массив всех подключённых Nexus-пакетов текущей сборки." },
+  { "name": "getPackageInfo", "kind": "Функция", "cat": "sdk", "ver": "v7.0", "sig": 'getPackageInfo("@author/pkg") -> meta | null', "desc": "Возвращает метаданные установленного Nexus-пакета по имени или null." },
+  { "name": "material3D", "kind": "Функция", "cat": "draw", "ver": "v7.0", "sig": "material3D({ color, metallic, roughness, normalMap, emissive, ao, toon })", "desc": "Создаёт переиспользуемый PBR-материал для scene3D v2 с металличностью, шероховатостью, картами нормалей, свечением и тенями." },
+  { "name": "animator3D", "kind": "Функция", "cat": "draw", "ver": "v7.0", "sig": 'animator3D(parsedGltf).play("run", { fade: 0.25 }) / .crossFade() / .update(dt)', "desc": "Скелетный 3D-аниматор для .glb/.gltf моделей: иерархия костей, SLERP-кватернионы, плавный кроссфейд и GPU/CPU скиннинг." },
+  { "name": "worldTerrain3D", "kind": "Функция", "cat": "draw", "ver": "v7.0", "sig": "worldTerrain3D(s3, { width, depth, heightScale, layers }).heightAt(x,z) / .normalAt(x,z) / .sculpt()", "desc": "WebGL2 3D-террейн с 4-слойным мультитекстурированием по высоте и наклону (песок/трава/скалы/снег) и живым скульптингом." },
+  { "name": "decal3D", "kind": "Функция", "cat": "fx", "ver": "v7.0", "sig": 'decal3D(s3, { maxDecals }).stamp(pos, normal, { preset: "bullet"|"scorch"|"blood"|"crack"|"rune", life })', "desc": "Проецирует ориентированные 3D-декали на поверхности (следы пуль, взрывов, трещины, руны) с защитой от z-fighting и затуханием." },
+  { "name": "ui3D", "kind": "Функция", "cat": "ui", "ver": "v7.0", "sig": 'ui3D(s3).add(target, { text, hp, maxHp }) / .popup(pos, "-42") / .draw()', "desc": "Мировой 3D-UI над объектами в scene3D: проекция 3D->2D, отсечение за камерой, масштабирование по глубине, HP-бары и всплывающий урон." },
+  { "name": "sectorWorld25D", "kind": "Функция", "cat": "draw", "ver": "v7.0", "sig": "sectorWorld25D().addRoom() / .addStairs() / .addBridge() / .addSprite({ frames8 }) / .fireHitscan() / .render(player)", "desc": "Секторный 2.5D-движок с разной высотой пола/потолка, лестницами, 3D-мостами, прыжками, динамическим цветным светом, дырками от пуль и 8-сторонними спрайтами." },
+  { "name": "hd2dScene", "kind": "Функция", "cat": "draw", "ver": "v7.0", "sig": 'hd2dScene({ preset: "sunset" }).addSprite2D() / .addTorch() / .follow(hero) / .setFocus() / .render()', "desc": "Режим HD-2D в стиле Octopath Traveler: пиксель-арт 2D-спрайты внутри настоящего WebGL2 3D с тенями Shadow Mapping, DoF-боке, Bloom и факелами." },
+  { "name": "textArea", "kind": "Функция UI", "cat": "ui", "ver": "v7.0", "sig": "textArea(id, x, y, w, h, { value, lineNumbers, mono })", "desc": "Многострочный текстовый редактор с переносами Enter, навигацией стрелками, выделением мышью/Shift, буфером Ctrl+A/C/X/V и скроллом." },
+  { "name": "flexBox", "kind": "Функция UI", "cat": "ui", "ver": "v7.0", "sig": "flexBox(x, y, w, h, { dir, justify, align, wrap, gap, pad }, items)", "desc": "Настоящий Flexbox-лейаут с поддержкой justify (start/center/end/between/around/evenly), align, wrap, grow, shrink, basis и alignSelf." },
+  { "name": "uiTable", "kind": "Функция UI", "cat": "ui", "ver": "v7.0", "sig": "uiTable(id, x, y, w, h, columns, rows, { sortKey, sortDir })", "desc": "Интерактивная таблица данных с сортировкой по клику на колонки (числа и строки), подсветкой, выбором строк и колесом мыши." },
+  { "name": "treeView", "kind": "Функция UI", "cat": "ui", "ver": "v7.0", "sig": "treeView(id, x, y, w, h, nodes, opts?) -> { selectedId, visibleCount, toggle }", "desc": "Сворачиваемое иерархическое дерево (иерархия сцен, проводник файлов) с отступами, шевронами и выбором узлов." },
+  { "name": "colorPicker", "kind": "Функция UI", "cat": "ui", "ver": "v7.0", "sig": "colorPicker(id, x, y, w, h, hexValue, opts?) -> hex", "desc": "Интерактивный HSV-пикер цвета с 2D-полем насыщенности/яркости, радужной шкалой оттенка и hex-кодом." },
+  { "name": "contextMenu", "kind": "Функция UI", "cat": "ui", "ver": "v7.0", "sig": "contextMenu(id, [{ id, label, shortcut, action }], { bounds })", "desc": "Всплывающее контекстное ПКМ-меню с иконками, хоткеями, разделителями, закрытием по Escape и авто-зажимом в границах окна." },
+  { "name": "splitPane", "kind": "Функция UI", "cat": "ui", "ver": "v7.0", "sig": "splitPane(id, x, y, w, h, { dir, ratio }, fnA, fnB) -> { paneA, paneB, ratio }", "desc": "Разделяемая область с перетаскиваемой границей (horizontal/vertical) и автоматическим клиппингом обеих панелей." },
+  { "name": "parseRoyUI", "kind": "Функция UI", "cat": "ui", "ver": "v7.0", "sig": 'parseRoyUI(royuiSource) -> { version, format: "royui", roots }', "desc": "Парсер декларативного формата .royui в структурированное дерево компонентов интерфейса." },
+  { "name": "renderRoyUI", "kind": "Функция UI", "cat": "ui", "ver": "v7.0", "sig": "renderRoyUI(treeOrSrc, { x, y, w, h, data }) -> { actions, values }", "desc": "Отрисовывает разметку .royui на холсте с привязкой данных {{var}} и возвращает сработавшие кнопки и значения полей." },
+  { "name": "gpuSpriteBatch", "kind": "Функция", "cat": "draw", "ver": "v7.0", "sig": "gpuSpriteBatch({ maxSprites, pixelated, additive }).begin() / .draw() / .drawRegion() / .end() / .stats()", "desc": "Аппаратный WebGL2 GPU 2D-батчер с предаллоцированным динамическим VBO для отрисовки 10 000–65 000+ спрайтов на 60 FPS." },
+  { "name": "audio3D", "kind": "Функция", "cat": "audio", "ver": "v7.0", "sig": 'audio3D({ panningModel: "HRTF", refDistance, maxDistance }).setListener() / .syncCamera() / .play() / .computeSpatial()', "desc": "Настоящий 3D HRTF-звук поверх Web Audio PannerNode с ориентацией слушателя, синхронизацией с камерами 3D/2.5D и точным расчётом азимута и затухания." },
+  { "name": "fn name<T>(...)", "kind": "Синтаксис", "cat": "syntax", "ver": "v7.0", "sig": "fn clamp<T>(v: T, lo: T, hi: T) -> T { ... }", "desc": "Дженерики (обобщённые функции) с автоматическим выводом типов при вызове и проверкой несовместимости в линтере." },
+  { "name": "struct / class <T>", "kind": "Синтаксис", "cat": "syntax", "ver": "v7.0", "sig": "struct Box<T>(val: T) / class Stack<T>() / type Pair<A, B> = { a: A, b: B }", "desc": "Обобщённые структуры, классы, сущности и параметризованные type-алиасы с проверкой типов на этапе компиляции." },
+  { "name": "#if TARGET_WEB", "kind": "Директива", "cat": "syntax", "ver": "v7.0", "sig": "#if TARGET_WEB ... #else ... #endif", "desc": "Условная компиляция веток кода специально для веб-сборки HTML5 / WebGL2 / JS." },
+  { "name": "#if TARGET_LUAU", "kind": "Директива", "cat": "syntax", "ver": "v7.0", "sig": "#if TARGET_LUAU ... #endif", "desc": "Условная компиляция веток кода специально для Roblox Luau (--!strict + Rojo)." },
+  { "name": "#if TARGET_LUA", "kind": "Директива", "cat": "syntax", "ver": "v7.0", "sig": "#if TARGET_LUA ... #endif", "desc": "Условная компиляция веток кода специально для LÖVE2D / Lua 5.4." },
+  { "name": "#if TARGET_CSHARP", "kind": "Директива", "cat": "syntax", "ver": "v7.0", "sig": "#if TARGET_CSHARP ... #endif", "desc": "Условная компиляция веток кода специально для Unity C# (MonoBehaviour)." },
+  { "name": "#if TARGET_GDSCRIPT", "kind": "Директива", "cat": "syntax", "ver": "v7.0", "sig": "#if TARGET_GDSCRIPT ... #endif", "desc": "Условная компиляция веток кода специально для Godot 4 (GDScript)." },
+  { "name": 'import "@author/pkg"', "kind": "Синтаксис", "cat": "syntax", "ver": "v7.0", "sig": 'import { fnA } from "@author/pkg" / import sub from "@author/pkg/sub"', "desc": "Импорт установленного Nexus-пакета или его подмодуля с автоматическим резолвом через roypkg.json." },
+  { "name": "import *.glsl / *.royui", "kind": "Синтаксис", "cat": "assets", "ver": "v7.0", "sig": 'import frag from "./fx.glsl" / import hud from "./hud.royui"', "desc": "Текстовый импорт файлов .glsl, .svg, .txt и .royui напрямую в строковую переменную на этапе компиляции." },
+  { "name": "sourceMap (VLQ)", "kind": "Компилятор", "cat": "sdk", "ver": "v7.0", "sig": "RoyLang.compile(code, { sourceMap: true }) -> { jsCode, sourceMap }", "desc": "Генерация стандартных пошаговых Source Maps v3 (VLQ) для точного сопоставления ошибок со строками исходных .roy файлов." },
+  { "name": "--target luau", "kind": "Таргет", "cat": "sdk", "ver": "v7.0", "sig": "roylang build main.roy --target luau -o out-roblox", "desc": "Мультитаргетная компиляция проекта в Roblox Luau (--!strict) с RoyBridge.luau и Rojo-конфигом default.project.json." },
+  { "name": "--target lua", "kind": "Таргет", "cat": "sdk", "ver": "v7.0", "sig": "roylang build main.roy --target lua -o out-love2d", "desc": "Мультитаргетная компиляция проекта в Lua 5.4 / LÖVE2D с адаптером roy_bridge.lua и conf.lua." },
+  { "name": "--target csharp", "kind": "Таргет", "cat": "sdk", "ver": "v7.0", "sig": "roylang build main.roy --target csharp -o out-unity", "desc": "Мультитаргетная компиляция проекта в Unity C# (MonoBehaviour + RoyBridge.cs)." },
+  { "name": "--target gdscript", "kind": "Таргет", "cat": "sdk", "ver": "v7.0", "sig": "roylang build main.roy --target gdscript -o out-godot", "desc": "Мультитаргетная компиляция проекта в Godot 4 GDScript (main.gd + roy_bridge.gd + project.godot)." },
+  { "name": "lintTarget", "kind": "Компилятор", "cat": "sdk", "ver": "v7.0", "sig": 'RoyLang.lintTarget(code, "luau"|"lua"|"csharp"|"gdscript") / roylang check --target luau', "desc": "Таргет-линтер совместимости API: заранее предупреждает, какие вызовы поддержаны нативно, через мост или требуют #if TARGET_*." },
+  { "name": "roypkg.json", "kind": "Манифест", "cat": "sdk", "ver": "v7.0", "sig": '{ "name": "@author/pkg", "version": "1.0.0", "type": "roy", "entry": "src/index.roy", "targets": ["web", "luau"] }', "desc": "Стандартный манифест Nexus-пакета с валидацией через RoyLang.nexus.validateManifest() и декларацией прав и таргетов." },
+  { "name": ".roypkg", "kind": "Формат", "cat": "sdk", "ver": "v7.0", "sig": "RoyLang.nexus.pack(manifest, files) / RoyLang.nexus.unpack(bundle)", "desc": "Автономный портативный формат пакета Nexus для локальной установки, пересылки и публикации без центрального сервера." },
+  { "name": "definePlugin (11 хуков)", "kind": "Плагин API", "cat": "hooks", "ver": "v7.0", "sig": "definePlugin(name, (ctx) => ({ onInit, onStart, onBeforeUpdate, onAfterUpdate, onBeforeDraw, onAfterDraw, onDrawUi, onInput, onResize, onSceneChange, onDestroy }))", "desc": "Расширенный жизненный цикл плагинов v7.0 Nexus: 11 официальных хуков для полного контроля над циклом движка, вводом и рендером." },
+  { "name": "scene3D.enableShadows", "kind": "Метод 3D", "cat": "fx", "ver": "v7.0", "sig": "s3.enableShadows({ resolution: 1024, bias: 0.002, pcf: true })", "desc": "Включает динамические тени Shadow Mapping с мягкой PCF-фильтрацией в WebGL2 scene3D v2." },
+  { "name": "scene3D.setPostFX", "kind": "Метод 3D", "cat": "fx", "ver": "v7.0", "sig": "s3.setPostFX({ bloom: 0.45, ssao: 0.3, dof: { focus: 12 }, toon: false })", "desc": "Аппаратный 3D PostFX-пайплайн поверх scene3D v2: свечение Bloom, глубина резкости DoF, затенение SSAO и cel-shading Toon." },
+  { "name": "textInput (выделение/буфер)", "kind": "Функция UI", "cat": "ui", "ver": "v7.0", "sig": "textInput(id, x, y, w, h, val, opts) — мышь/Shift выделение + Ctrl+A/C/X/V", "desc": "Прокачанный в UI 3.0 однострочный ввод: выделение мышью и Shift+стрелки, двойной клик по слову и системный буфер обмена Ctrl+A/C/X/V." },
+  { "name": ".royui", "kind": "Формат UI", "cat": "ui", "ver": "v7.0", "sig": 'panel "Title" { flex dir="col" gap=8 { label "HP: {{hp}}"; button id="ok" text="OK" } }', "desc": "Декларативный формат разметки интерфейса UI 3.0 с вложенными контейнерами, темами и реактивной подстановкой {{var}}." },
+  { "name": "interface", "kind": "Ключевое слово", "cat": "syntax", "ver": "v7.0", "sig": "interface Damageable { fn takeDamage(n: num) -> num }", "desc": "Объявляет контракт интерфейса с требуемыми методами и полями; проверяется статическим линтером и оператором is в рантайме." },
+  { "name": "trait", "kind": "Ключевое слово", "cat": "syntax", "ver": "v7.0", "sig": "trait Regen { let rate: num = 2; fn tick() { this.hp += this.rate } }", "desc": "Объявляет переиспользуемый миксин-трейт с готовыми методами, обязательными сигнатурами и полями по умолчанию." },
+  { "name": "implements", "kind": "Ключевое слово", "cat": "syntax", "ver": "v7.0", "sig": "struct Hero(hp: num) implements Damageable, Regen { ... }", "desc": "Подключает интерфейсы и трейты к struct, class или entity с проверкой выполнения контракта и наследованием методов трейта." },
+  { "name": "--target server", "kind": "Таргет", "cat": "sdk", "ver": "v7.0", "sig": "roylang build main.roy --target server -o out-server", "desc": "Компиляция .roy в автономный авторитетный мультиплеер-сервер Node.js (server.mjs + RoyServerBridge.mjs + package.json) с комнатами, матчмейкингом, античитом и KV-БД." },
+  { "name": "--target wasm", "kind": "Таргет", "cat": "sdk", "ver": "v7.0", "sig": "roylang build main.roy --target wasm -o out-wasm", "desc": "Компиляция числовых и физических .roy функций в нативный бинарный WebAssembly (.wasm + .wat + roy_wasm_bridge.mjs) для ускорения ×10–×30." },
+  { "name": "--target android", "kind": "Таргет", "cat": "sdk", "ver": "v7.0", "sig": "roylang build main.roy --target android -o out-android", "desc": "Сборка нативного Android Gradle-проекта для .apk (MainActivity + RoyAndroidBridge для вибрации/сенсоров/кнопки Назад + локальный build-apk и облачный GitHub Actions workflow)." },
+  { "name": "#if TARGET_SERVER", "kind": "Директива", "cat": "syntax", "ver": "v7.0", "sig": "#if TARGET_SERVER ... #else ... #endif", "desc": "Условная компиляция веток кода для авторитетного серверного таргета Node.js." },
+  { "name": "#if TARGET_WASM", "kind": "Директива", "cat": "syntax", "ver": "v7.0", "sig": "#if TARGET_WASM ... #endif", "desc": "Условная компиляция веток кода для нативного WebAssembly таргета." },
+  { "name": "#if TARGET_ANDROID", "kind": "Директива", "cat": "syntax", "ver": "v7.0", "sig": "#if TARGET_ANDROID ... #else ... #endif", "desc": "Условная компиляция мобильных веток кода (сенсорный ввод, вибрация, ориентация) для Android APK таргета." },
+  { "name": "RoyLang.lsp", "kind": "Компилятор", "cat": "sdk", "ver": "v7.0", "sig": "RoyLang.lsp.goToDefinition / findReferences / renameSymbol / getQuickFixes", "desc": "Встроенный LSP-сервис языка: переход к определению, поиск всех ссылок, безопасное переименование символа по проекту и авто-фиксы (Quick-Fixes)." },
+  { "name": "royDebugger", "kind": "Объект", "cat": "sdk", "ver": "v7.0", "sig": "royDebugger.setBreakpoint(file, line) / .stepOver() / .stepInto() / .resume() / .onPause()", "desc": "Пошаговый отладчик с точками останова, шагами и стеком вызовов поверх VLQ Source Maps (включается флагом debug: true при компиляции)." },
+  { "name": "osApp", "kind": "Объект", "cat": "sdk", "ver": "v7.0", "sig": "osApp.fs / osApp.tray / osApp.notify() / osApp.window / osApp.hotkey / osApp.clipboard", "desc": "Высокоуровневый системный мост для десктопных приложений и утилит поверх hostCall с аккуратным браузерным фоллбэком." },
+  { "name": "webgpuScene3D", "kind": "Функция", "cat": "draw", "ver": "v7.0", "sig": 'webgpuScene3D({ ibl: "sunset" }).addBox() / .addInstancedMesh() / .addLOD() / .render()', "desc": "Нативный 3D-рендерер нового поколения на WebGPU (WGSL PBR + IBL + Depth Buffer) с бесшовным авто-фоллбэком на WebGL2 scene3D." },
+  { "name": "scene3D.setIBL", "kind": "Метод 3D", "cat": "fx", "ver": "v7.0", "sig": 's3.setIBL("sky"|"studio"|"sunset"|"neon"|"night" | { skyTop, skyHorizon, intensity })', "desc": "Включает IBL-освещение и отражения окружения по пресетам или кастомному градиенту неба в scene3D / webgpuScene3D." },
+  { "name": "scene3D.addInstancedMesh", "kind": "Метод 3D", "cat": "draw", "ver": "v7.0", "sig": 's3.addInstancedMesh("cone", matOpts, transforms).addInstance() / .setInstance()', "desc": "Инстансинг-батчинг сотен и тысяч одинаковых 3D-мешей (деревья, пули, враги) с индивидуальными позициями и цветами." },
+  { "name": "scene3D.addLOD", "kind": "Метод 3D", "cat": "draw", "ver": "v7.0", "sig": "s3.addLOD([{ mesh: hi, maxDist: 15 }, { mesh: lo, maxDist: 60 }], [0, 0, 0])", "desc": "Автоматическое переключение уровней детализации (LOD) 3D-объекта по дистанции до камеры." },
+  { "name": "physics3D.addJoint", "kind": "Метод 3D", "cat": "physics", "ver": "v7.0", "sig": 'w3.addJoint(bodyA, bodyB, { type: "distance"|"hinge"|"spring"|"fixed", length, stiffness })', "desc": "Добавляет 3D-сустав/ограничение между двумя твёрдыми телами в physics3D для цепей, дверей, подвесок и рэгдоллов." },
+  { "name": "ragdoll3D", "kind": "Функция", "cat": "physics", "ver": "v7.0", "sig": "ragdoll3D(w3, { x, y, z, scale }).applyImpulse() / .getBones() / .syncToScene(s3)", "desc": "Готовый 10-костный физический 3D-рэгдолл (голова, торс, конечности) на суставах physics3D с синхронизацией мешей." },
+  { "name": "navMesh3D", "kind": "Функция", "cat": "physics", "ver": "v7.0", "sig": "navMesh3D().addQuad(...) / .buildFromMesh(geom) / .findPath(start, goal) / .sampleHeight(x, z)", "desc": "Настоящий полигональный 3D NavMesh поверх треугольников/мешей со склонами, мостами и многоэтажным A* поиском пути." },
+  { "name": "p2pRoom.enableVoice", "kind": "Метод сети", "cat": "sdk", "ver": "v7.0", "sig": "await room.enableVoice() / .setVoiceMuted(bool) / .setPeerVolume(id, v) / .getVoiceLevel()", "desc": "Встроенный голосовой чат поверх WebRTC Audio прямо внутри P2P-комнаты с индивидуальной громкостью игроков и анализатором уровня речи." },
+  { "name": "lagCompensator", "kind": "Функция", "cat": "sdk", "ver": "v7.0", "sig": "lagCompensator({ maxHistoryMs }).record(ts, snapshot) / .rewind(ts, rttMs) / .raycastHit()", "desc": "Серверная лаг-компенсация и откат 2D/3D-хитбоксов по RTT игрока для честного попадания в онлайн-шутерах." },
+  { "name": "serverRoom", "kind": "Функция", "cat": "sdk", "ver": "v7.0", "sig": "serverRoom({ tickRate: 20 }).join(id) / .pushInput(id, inp) / .step(dt) / .getSnapshot()", "desc": "Авторитетная игровая комната с фиксированным тиком, буфером команд игроков, снапшотами и синхронизацией состояния." },
+  { "name": "matchmaker", "kind": "Функция", "cat": "sdk", "ver": "v7.0", "sig": "matchmaker({ roomSize: 2, maxSkillDiff: 150 }).enqueue(p) / .dequeue(id) / .tick()", "desc": "Очередь матчмейкинга по рейтингу (MMR/ELO) и региону с автоматическим расширением окна подбора и формированием матчей." },
+  { "name": "antiCheat", "kind": "Функция", "cat": "sdk", "ver": "v7.0", "sig": "antiCheat({ maxSpeed, maxFireRate }).validateMove() / .validateFire() / .validateDamage()", "desc": "Античит-валидатор перемещений, телепортов, скорострельности и урона с подсчётом страйков и уровня доверия игрока." },
+  { "name": "audioDSP", "kind": "Функция", "cat": "audio", "ver": "v7.0", "sig": "audioDSP({ eq, compressor, delay, chorus, distortion }).processPCM(buf, sr) / .connect(node)", "desc": "Цепочка DSP-эффектов уровня мини-DAW: 3-полосный EQ, компрессор, дилей, хорус и дисторшн (Web Audio + оффлайн PCM)." },
+  { "name": "audioSampler", "kind": "Функция", "cat": "audio", "ver": "v7.0", "sig": "audioSampler({ attack, decay, sustain, release }).loadSample() / .noteOn(note) / .renderNote()", "desc": "Полифонический сэмплер с ADSR-огибающей, пересчётом высоты тона по нотам и оффлайн-рендером сэмплов." },
+  { "name": "audioTracker", "kind": "Функция", "cat": "audio", "ver": "v7.0", "sig": "audioTracker({ bpm: 128, steps: 16 }).addTrack(name, opts) / .play() / .renderPCM(bars, sr)", "desc": "Многодорожечный трекер-секвенсор мини-DAW для создания музыки по паттернам с рендером готового PCM-буфера." },
+  { "name": "exportWav", "kind": "Функция", "cat": "audio", "ver": "v7.0", "sig": "exportWav(pcmFloat32, { sampleRate: 44100 }) -> { bytes, dataUrl, durationSec, download }", "desc": "Настоящий бинарный энкодер 16-bit PCM RIFF/WAVE (.wav) для сохранения готовых треков и звуков из мини-DAW." },
+  { "name": "handTrack", "kind": "Функция", "cat": "input", "ver": "v7.0", "sig": "handTrack().processFrame(imageData) -> { detected, gesture, fingers, palm, pinch }", "desc": "Zero-SDK трекинг кисти и пальцев по цветовому/контурному анализу кадра: определяет жесты fist, point, peace, open и pinch." },
+  { "name": "faceTrack", "kind": "Функция", "cat": "input", "ver": "v7.0", "sig": "faceTrack().processFrame(imageData) -> { detected, yaw, pitch, roll, blink, mouthOpen }", "desc": "Zero-SDK трекинг лица и головы с веб-камеры: оценивает повороты головы, моргание и открытие рта без внешних библиотек." },
+  { "name": "arMarker", "kind": "Функция", "cat": "input", "ver": "v7.0", "sig": "arMarker().generate(id) / .detect(imageData) -> [{ id, corners, center, rot, size }]", "desc": "Генератор и детектор 4×4 фидуциальных AR-маркеров с проверкой чётности и оценкой 2D/3D-позы без внешних SDK." },
+  { "name": "motionSensors", "kind": "Функция", "cat": "input", "ver": "v7.0", "sig": "motionSensors().start() / .getTilt() / .onShake(fn) / .simulate(data)", "desc": "Доступ к гироскопу (DeviceOrientation), акселерометру (DeviceMotion) и детектору встряхивания на смартфонах и планшетах." },
+  { "name": "haptics", "kind": "Функция", "cat": "input", "ver": "v7.0", "sig": 'haptics.preset("light"|"medium"|"heavy"|"success"|"error"|"impact") / .vibrate(pattern)', "desc": "Кроссплатформенная тактильная отдача (Vibration API + Gamepad Dual-Rumble) с готовыми игровыми пресетами." },
+  { "name": "touchControls", "kind": "Функция", "cat": "input", "ver": "v7.0", "sig": 'touchControls({ layout: "platformer"|"twinstick"|"racing"|"rpg" }).getState() / .draw()', "desc": "Адаптивный мобильный сенсорный HUD с виртуальными стиками, кнопками и автоматической подстройкой под ориентацию экрана." },
+  { "name": "lipSync", "kind": "Функция", "cat": "audio", "ver": "v7.0", "sig": "lipSync({ text }).update(dt) / .getViseme() / .analyzeAudio(samples) / .drawMouth(x, y, r)", "desc": "Автоматический липсинк персонажей под текст, voiceBlip и speechSynth: расчёт визем (A/E/I/O/U/M/F) и готовая отрисовка рта." },
+  { "name": "cameraSpline3D", "kind": "Функция", "cat": "draw", "ver": "v7.0", "sig": "cameraSpline3D({ points, lookAt, duration, loop }).sample(t) / .update(dt) / .applyTo(s3)", "desc": "Пролёт 2D/3D-камеры по гладкому сплайну Catmull-Rom с наведением на цель или второй сплайн lookAt для катсцен." },
+  { "name": "directorTimeline", "kind": "Функция", "cat": "scenes", "ver": "v7.0", "sig": "directorTimeline({ duration }).addTrack(name, keys) / .addEvent(t, fn) / .exportRoyson()", "desc": "Таймлайн режиссуры катсцен с ключевыми кадрами, интерполяцией, событиями, предпросмотром и сохранением/загрузкой .royson." }
 ];
 var docs_default = {
   ROY_DOCS_VERSION,

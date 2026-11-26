@@ -264,6 +264,116 @@ fn git_commit(root: String, message: String) -> Result<String, String> {
 }
 
 #[tauri::command]
+fn git_show_head(root: String, rel: String) -> Result<String, String> {
+    let spec = format!("HEAD:{}", rel.replace('\\', "/"));
+    let out = Command::new("git")
+        .args(["show", &spec])
+        .current_dir(&root)
+        .output()
+        .map_err(|e| e.to_string())?;
+    if !out.status.success() {
+        return Ok(String::new());
+    }
+    Ok(String::from_utf8_lossy(&out.stdout).to_string())
+}
+
+#[tauri::command]
+fn git_branches(root: String) -> Result<Vec<String>, String> {
+    let out = Command::new("git")
+        .args(["branch", "--format=%(refname:short)"])
+        .current_dir(&root)
+        .output()
+        .map_err(|e| e.to_string())?;
+    if !out.status.success() {
+        return Ok(Vec::new());
+    }
+    Ok(String::from_utf8_lossy(&out.stdout)
+        .lines()
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .collect())
+}
+
+#[tauri::command]
+fn git_checkout(root: String, branch: String, create: bool) -> Result<String, String> {
+    let args: Vec<&str> = if create {
+        vec!["checkout", "-b", &branch]
+    } else {
+        vec!["checkout", &branch]
+    };
+    let out = Command::new("git")
+        .args(&args)
+        .current_dir(&root)
+        .output()
+        .map_err(|e| e.to_string())?;
+    if !out.status.success() {
+        return Err(String::from_utf8_lossy(&out.stderr).to_string());
+    }
+    Ok(String::from_utf8_lossy(&out.stdout).to_string())
+}
+
+#[tauri::command]
+fn git_log(root: String, limit: usize) -> Result<Vec<String>, String> {
+    let n = limit.clamp(1, 50).to_string();
+    let out = Command::new("git")
+        .args(["log", "-n", &n, "--pretty=format:%h · %s (%cr)"])
+        .current_dir(&root)
+        .output()
+        .map_err(|e| e.to_string())?;
+    if !out.status.success() {
+        return Ok(Vec::new());
+    }
+    Ok(String::from_utf8_lossy(&out.stdout)
+        .lines()
+        .map(|s| s.to_string())
+        .collect())
+}
+
+#[tauri::command]
+fn git_discard(root: String, rel: String) -> Result<String, String> {
+    let clean = rel.replace('\\', "/");
+    let out = Command::new("git")
+        .args(["checkout", "--", &clean])
+        .current_dir(&root)
+        .output()
+        .map_err(|e| e.to_string())?;
+    if !out.status.success() {
+        return Err(String::from_utf8_lossy(&out.stderr).to_string());
+    }
+    Ok("OK".into())
+}
+
+#[derive(Serialize)]
+pub struct TermOutput {
+    pub code: i32,
+    pub stdout: String,
+    pub stderr: String,
+}
+
+#[tauri::command]
+fn run_terminal_command(cwd: Option<String>, command: String) -> Result<TermOutput, String> {
+    let dir = cwd.filter(|s| !s.trim().is_empty()).unwrap_or_else(|| ".".to_string());
+    #[cfg(target_os = "windows")]
+    let out = Command::new("cmd")
+        .args(["/C", &command])
+        .current_dir(&dir)
+        .output()
+        .map_err(|e| e.to_string())?;
+    #[cfg(not(target_os = "windows"))]
+    let out = Command::new("sh")
+        .args(["-c", &command])
+        .current_dir(&dir)
+        .output()
+        .map_err(|e| e.to_string())?;
+
+    Ok(TermOutput {
+        code: out.status.code().unwrap_or(-1),
+        stdout: String::from_utf8_lossy(&out.stdout).to_string(),
+        stderr: String::from_utf8_lossy(&out.stderr).to_string(),
+    })
+}
+
+#[tauri::command]
 fn get_parent_dir(file_path: String) -> Result<String, String> {
     let p = Path::new(&file_path);
     p.parent()
@@ -661,7 +771,7 @@ fn get_launch_file() -> Option<String> {
             .to_ascii_lowercase();
         if matches!(
             ext.as_str(),
-            "roy" | "roylang" | "royson" | "royproj" | "royscene" | "royprefab" | "royanim" | "roymodel" | "roydata" | "lua" | "luau" | "py" | "md"
+            "roy" | "roylang" | "royson" | "royproj" | "royscene" | "royprefab" | "royanim" | "roymodel" | "roydata" | "lua" | "luau" | "cs" | "gd" | "py" | "md"
         ) && p.is_file() {
             let resolved = p.canonicalize().unwrap_or_else(|_| p.to_path_buf());
             let s = resolved.to_string_lossy().to_string();
@@ -1065,7 +1175,306 @@ fn relaunch_app(app: AppHandle) {
     app.restart();
 }
 
+#[tauri::command]
+fn host_os_call(app: AppHandle, cmd: String, payload: serde_json::Value) -> Result<serde_json::Value, String> {
+    let win = app.get_webview_window("main");
+    match cmd.as_str() {
+        "fs:readText" => {
+            let path = payload.get("path").and_then(|v| v.as_str()).ok_or("Missing path")?;
+            let text = fs::read_to_string(path).map_err(|e| e.to_string())?;
+            Ok(serde_json::json!({ "ok": true, "text": text }))
+        }
+        "fs:writeText" => {
+            let path = payload.get("path").and_then(|v| v.as_str()).ok_or("Missing path")?;
+            let text = payload.get("text").and_then(|v| v.as_str()).unwrap_or("");
+            if let Some(parent) = Path::new(path).parent() {
+                let _ = fs::create_dir_all(parent);
+            }
+            fs::write(path, text.as_bytes()).map_err(|e| e.to_string())?;
+            Ok(serde_json::json!({ "ok": true, "bytes": text.len() }))
+        }
+        "fs:readDir" => {
+            let path = payload.get("path").and_then(|v| v.as_str()).ok_or("Missing path")?;
+            let entries = fs::read_dir(path).map_err(|e| e.to_string())?;
+            let mut list = Vec::new();
+            for e in entries.flatten() {
+                let is_dir = e.metadata().map(|m| m.is_dir()).unwrap_or(false);
+                list.push(serde_json::json!({
+                    "name": e.file_name().to_string_lossy().to_string(),
+                    "isDir": is_dir
+                }));
+            }
+            Ok(serde_json::json!({ "ok": true, "entries": list }))
+        }
+        "fs:exists" => {
+            let path = payload.get("path").and_then(|v| v.as_str()).unwrap_or("");
+            Ok(serde_json::json!({ "ok": true, "exists": !path.is_empty() && Path::new(path).exists() }))
+        }
+        "window:setTitle" => {
+            if let Some(w) = &win {
+                let title = payload.get("title").and_then(|v| v.as_str()).unwrap_or("RoyLang App");
+                let _ = w.set_title(title);
+            }
+            Ok(serde_json::json!({ "ok": true }))
+        }
+        "window:setSize" => {
+            if let Some(w) = &win {
+                let width = payload.get("width").and_then(|v| v.as_f64()).unwrap_or(1024.0);
+                let height = payload.get("height").and_then(|v| v.as_f64()).unwrap_or(720.0);
+                let _ = w.set_size(tauri::LogicalSize::new(width, height));
+            }
+            Ok(serde_json::json!({ "ok": true }))
+        }
+        "window:minimize" => {
+            if let Some(w) = &win {
+                let _ = w.minimize();
+            }
+            Ok(serde_json::json!({ "ok": true }))
+        }
+        "window:maximize" => {
+            if let Some(w) = &win {
+                if w.is_maximized().unwrap_or(false) {
+                    let _ = w.unmaximize();
+                } else {
+                    let _ = w.maximize();
+                }
+            }
+            Ok(serde_json::json!({ "ok": true }))
+        }
+        "window:setAlwaysOnTop" => {
+            if let Some(w) = &win {
+                let flag = payload.get("alwaysOnTop").and_then(|v| v.as_bool()).unwrap_or(true);
+                let _ = w.set_always_on_top(flag);
+            }
+            Ok(serde_json::json!({ "ok": true }))
+        }
+        "os:notify" | "tray:setIcon" | "tray:setTooltip" | "tray:setMenu" => {
+            Ok(serde_json::json!({ "ok": true, "handled": true }))
+        }
+        _ => Ok(serde_json::json!({ "ok": false, "error": format!("Unsupported host command: {}", cmd) })),
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
+#[derive(Serialize)]
+pub struct AndroidBuildResult {
+    pub ok: bool,
+    pub apk_path: Option<String>,
+    pub apk_dir: Option<String>,
+    pub missing: Vec<String>,
+    pub message: String,
+}
+
+fn find_android_sdk() -> Option<PathBuf> {
+    for var in ["ANDROID_HOME", "ANDROID_SDK_ROOT"] {
+        if let Ok(val) = std::env::var(var) {
+            let p = PathBuf::from(val.trim());
+            if p.is_dir() {
+                return Some(p);
+            }
+        }
+    }
+    #[cfg(windows)]
+    if let Ok(local_app) = std::env::var("LOCALAPPDATA") {
+        let p = PathBuf::from(local_app).join("Android").join("Sdk");
+        if p.is_dir() {
+            return Some(p);
+        }
+    }
+    #[cfg(not(windows))]
+    if let Ok(home) = std::env::var("HOME") {
+        for sub in ["Android/Sdk", "Library/Android/sdk"] {
+            let p = PathBuf::from(&home).join(sub);
+            if p.is_dir() {
+                return Some(p);
+            }
+        }
+    }
+    None
+}
+
+fn check_java_17_plus() -> bool {
+    let mut cmd = Command::new("java");
+    cmd.arg("-version");
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        cmd.creation_flags(0x08000000);
+    }
+    let Ok(out) = cmd.output() else {
+        return false;
+    };
+    if !out.status.success() {
+        return false;
+    }
+    let text = format!(
+        "{}\n{}",
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr)
+    );
+    for line in text.lines() {
+        if let Some(q1) = line.find('"') {
+            if let Some(q2) = line[q1 + 1..].find('"') {
+                let ver = &line[q1 + 1..q1 + 1 + q2];
+                let major_str = ver.split('.').next().unwrap_or("0");
+                if let Ok(major) = major_str.parse::<u32>() {
+                    return major >= 17;
+                }
+            }
+        }
+    }
+    true
+}
+
+fn check_gradle_cmd(project_path: &Path) -> Option<String> {
+    #[cfg(windows)]
+    let wrapper = project_path.join("gradlew.bat");
+    #[cfg(not(windows))]
+    let wrapper = project_path.join("gradlew");
+    if wrapper.is_file() {
+        return Some(wrapper.to_string_lossy().to_string());
+    }
+    let mut cmd = Command::new(if cfg!(windows) { "gradle.bat" } else { "gradle" });
+    cmd.arg("--version");
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        cmd.creation_flags(0x08000000);
+    }
+    if let Ok(out) = cmd.output() {
+        if out.status.success() {
+            return Some(if cfg!(windows) { "gradle.bat" } else { "gradle" }.to_string());
+        }
+    }
+    let mut cmd2 = Command::new("gradle");
+    cmd2.arg("--version");
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        cmd2.creation_flags(0x08000000);
+    }
+    if let Ok(out) = cmd2.output() {
+        if out.status.success() {
+            return Some("gradle".to_string());
+        }
+    }
+    None
+}
+
+#[tauri::command]
+async fn build_android_apk(app: AppHandle, project_dir: String) -> Result<AndroidBuildResult, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        use std::io::{BufRead, BufReader};
+        use std::process::Stdio;
+
+        let proj = PathBuf::from(&project_dir);
+        if !proj.is_dir() {
+            return Ok(AndroidBuildResult {
+                ok: false,
+                apk_path: None,
+                apk_dir: None,
+                missing: vec![],
+                message: format!("Папка проекта не найдена: {}", project_dir),
+            });
+        }
+
+        let mut missing = Vec::new();
+        if !check_java_17_plus() {
+            missing.push("JDK 17+ (команда java не найдена или версия < 17)".to_string());
+        }
+        let sdk_opt = find_android_sdk();
+        if sdk_opt.is_none() {
+            missing.push("Android SDK (не задан ANDROID_HOME и не найден %LOCALAPPDATA%\\Android\\Sdk)".to_string());
+        }
+        let gradle_opt = check_gradle_cmd(&proj);
+        if gradle_opt.is_none() {
+            missing.push("Gradle (не найден gradle в PATH и отсутствует gradlew.bat)".to_string());
+        }
+
+        if !missing.is_empty() {
+            return Ok(AndroidBuildResult {
+                ok: false,
+                apk_path: None,
+                apk_dir: None,
+                missing: missing.clone(),
+                message: format!("Для локальной сборки .apk не хватает: {}", missing.join("; ")),
+            });
+        }
+
+        let sdk_path = sdk_opt.unwrap();
+        let sdk_str = sdk_path.to_string_lossy().to_string();
+        let escaped_sdk = sdk_str.replace('\\', "\\\\").replace(':', "\\:");
+        let local_props = proj.join("local.properties");
+        let _ = fs::write(&local_props, format!("sdk.dir={}\n", escaped_sdk));
+
+        let gradle_bin = gradle_opt.unwrap();
+        let _ = app.emit("android-build-log", format!("> {} assembleDebug --no-daemon", gradle_bin));
+        let _ = app.emit("android-build-log", format!("> ANDROID_HOME={}", sdk_str));
+
+        let mut cmd = Command::new(&gradle_bin);
+        cmd.arg("assembleDebug")
+            .arg("--no-daemon")
+            .current_dir(&proj)
+            .env("ANDROID_HOME", &sdk_str)
+            .env("ANDROID_SDK_ROOT", &sdk_str)
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped());
+
+        #[cfg(windows)]
+        {
+            use std::os::windows::process::CommandExt;
+            cmd.creation_flags(0x08000000);
+        }
+
+        let mut child = cmd.spawn().map_err(|e| format!("Не удалось запустить {}: {}", gradle_bin, e))?;
+        let stdout = child.stdout.take();
+        let stderr = child.stderr.take();
+
+        let app1 = app.clone();
+        let t1 = std::thread::spawn(move || {
+            if let Some(out) = stdout {
+                for line in BufReader::new(out).lines().map_while(Result::ok) {
+                    let _ = app1.emit("android-build-log", line);
+                }
+            }
+        });
+        let app2 = app.clone();
+        let t2 = std::thread::spawn(move || {
+            if let Some(err) = stderr {
+                for line in BufReader::new(err).lines().map_while(Result::ok) {
+                    let _ = app2.emit("android-build-log", line);
+                }
+            }
+        });
+
+        let status = child.wait().map_err(|e| format!("Ошибка ожидания Gradle: {}", e))?;
+        let _ = t1.join();
+        let _ = t2.join();
+
+        let apk_file = proj.join("app").join("build").join("outputs").join("apk").join("debug").join("app-debug.apk");
+        if status.success() && apk_file.is_file() {
+            let apk_dir = apk_file.parent().map(|p| p.to_string_lossy().to_string());
+            return Ok(AndroidBuildResult {
+                ok: true,
+                apk_path: Some(apk_file.to_string_lossy().to_string()),
+                apk_dir,
+                missing: vec![],
+                message: "Android APK успешно собран!".to_string(),
+            });
+        }
+
+        Ok(AndroidBuildResult {
+            ok: false,
+            apk_path: None,
+            apk_dir: None,
+            missing: vec![],
+            message: format!("Сборка Gradle завершилась с ошибкой (код {:?}). Проверьте лог выше.", status.code()),
+        })
+    })
+    .await
+    .map_err(|e| format!("Ошибка потока сборки Android: {}", e))?
+}
+
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
@@ -1082,7 +1491,7 @@ pub fn run() {
                     .to_ascii_lowercase();
                 if matches!(
             ext.as_str(),
-            "roy" | "roylang" | "royson" | "royproj" | "royscene" | "royprefab" | "royanim" | "roymodel" | "roydata" | "lua" | "luau" | "py" | "md"
+            "roy" | "roylang" | "royson" | "royproj" | "royscene" | "royprefab" | "royanim" | "roymodel" | "roydata" | "lua" | "luau" | "cs" | "gd" | "py" | "md"
         ) && p.is_file() {
                     let resolved = p.canonicalize().unwrap_or_else(|_| p.to_path_buf());
                     let s = resolved.to_string_lossy().to_string();
@@ -1116,6 +1525,7 @@ pub fn run() {
             get_parent_dir,
             export_zip_archive,
             build_standalone_exe,
+            build_android_apk,
             open_in_explorer,
             create_project_dir,
             rename_project_entry,
@@ -1123,6 +1533,12 @@ pub fn run() {
             git_status,
             git_init,
             git_commit,
+            git_show_head,
+            git_branches,
+            git_checkout,
+            git_log,
+            git_discard,
+            run_terminal_command,
             get_app_version,
             get_launch_file,
             fetch_roylang_releases,
@@ -1133,7 +1549,8 @@ pub fn run() {
             delete_installed_engine,
             check_ide_update,
             install_ide_update,
-            relaunch_app
+            relaunch_app,
+            host_os_call
         ])
         .run(tauri::generate_context!())
         .expect("error while running RoyStudio Desktop");

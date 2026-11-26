@@ -32,9 +32,9 @@ on draw {
 };
 
 const TEXT_EXTS = new Set([
-  'roy', 'roylang', 'royson', 'royproj', 'royscene', 'royprefab', 'royanim', 'roymodel', 'roydata',
+  'roy', 'roylang', 'royson', 'royproj', 'royscene', 'royprefab', 'royanim', 'roymodel', 'roydata', 'royui', 'roypkg',
   'tmj', 'tmx', 'ldtk', 'obj', 'mtl', 'gltf', 'glsl', 'frag', 'vert', 'wgsl', 'hlsl',
-  'lua', 'luau', 'py', 'fnt', 'ini', 'cfg', 'bat', 'ps1', 'sh', 'sql', 'rs', 'cs', 'cpp', 'c', 'h', 'hpp',
+  'lua', 'luau', 'gd', 'tscn', 'tres', 'godot', 'py', 'fnt', 'ini', 'cfg', 'bat', 'ps1', 'sh', 'sql', 'rs', 'cs', 'cpp', 'c', 'h', 'hpp',
   'html', 'htm', 'css', 'js', 'mjs', 'cjs', 'ts', 'jsx', 'tsx',
   'json', 'jsonl', 'md', 'txt', 'csv', 'toml', 'yaml', 'yml', 'env', 'svg', 'xml', 'rules'
 ]);
@@ -296,6 +296,36 @@ export function createFsBridge() {
       return tauriInvoke('git_commit', { root: rootPath, message });
     },
 
+    async gitShowHead(rel) {
+      if (mode !== 'tauri' || !rootPath) return '';
+      return tauriInvoke('git_show_head', { root: rootPath, rel });
+    },
+
+    async gitBranches() {
+      if (mode !== 'tauri' || !rootPath) return [];
+      return tauriInvoke('git_branches', { root: rootPath });
+    },
+
+    async gitCheckout(branch, create = false) {
+      if (mode !== 'tauri' || !rootPath) throw new Error('Git доступен в Desktop');
+      return tauriInvoke('git_checkout', { root: rootPath, branch, create });
+    },
+
+    async gitLog(limit = 15) {
+      if (mode !== 'tauri' || !rootPath) return [];
+      return tauriInvoke('git_log', { root: rootPath, limit });
+    },
+
+    async gitDiscard(rel) {
+      if (mode !== 'tauri' || !rootPath) throw new Error('Git доступен в Desktop');
+      return tauriInvoke('git_discard', { root: rootPath, rel });
+    },
+
+    async runTerminalCommand(command) {
+      if (!isTauriEnv()) return { code: 1, stdout: '', stderr: 'Терминал доступен в настольном RoyStudio Desktop' };
+      return tauriInvoke('run_terminal_command', { cwd: rootPath || null, command });
+    },
+
     async writeFile(rel, content) {
       if (mode === 'demo') {
         memoryFiles[rel] = content;
@@ -468,6 +498,18 @@ export function createFsBridge() {
       return tauriInvoke('scan_project', { root: rootPath });
     },
 
+    async hostOsCall(cmd, payload = {}) {
+      if (!isTauriEnv()) return { ok: false, error: 'Host OS Bridge доступен только в Desktop' };
+      return tauriInvoke('host_os_call', { cmd, payload });
+    },
+
+    async pickOpenFile(filters = []) {
+      if (!isTauriEnv()) return null;
+      return tauriInvoke('plugin:dialog|open', {
+        options: { multiple: false, directory: false, filters }
+      });
+    },
+
     async exportZipArchive(outPath, entries) {
       if (!isTauriEnv()) throw new Error('ZIP-экспорт на диск доступен в RoyStudio Desktop');
       return tauriInvoke('export_zip_archive', { outPath, entries });
@@ -483,6 +525,11 @@ export function createFsBridge() {
         iconPath: iconPath || null,
         projectRoot: projectRoot || null
       });
+    },
+
+    async buildAndroidApk(projectDir) {
+      if (!isTauriEnv()) throw new Error('Локальная сборка .apk доступна в RoyStudio Desktop');
+      return tauriInvoke('build_android_apk', { projectDir });
     },
 
     async openInExplorer(path) {

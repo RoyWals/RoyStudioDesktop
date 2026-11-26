@@ -32,7 +32,7 @@
         </button>
       </div>
       <div class="tb-actions">
-        <button class="ver-badge" id="engineVer" title="Версия движка RoyLang — нажмите для обновления или переключения">v6.9</button>
+        <button class="ver-badge" id="engineVer" title="Версия движка RoyLang — нажмите для обновления или переключения">v7.0</button>
         <button id="btnRun" class="primary compact-btn" title="Собрать и запустить игру (F5)">▶ F5</button>
         <button id="btnBuildModal" class="compact-btn" title="Сборка и экспорт: HTML / ZIP / EXE (Ctrl+Shift+B)">📦 Сборка</button>
         <button id="btnToggleSidebar" class="icon-btn active" title="Боковая панель (Ctrl+B)">
@@ -44,6 +44,7 @@
         <button id="btnTogglePreview" class="icon-btn active" title="Превью игры">
           <svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.3"><rect x="1.5" y="2" width="13" height="12" rx="1.5"/><line x1="10.5" y1="2" x2="10.5" y2="14"/></svg>
         </button>
+        <button id="btnOpenSettings" class="icon-btn" title="Настройки IDE (Settings)">⚙</button>
       </div>
     </header>
 
@@ -65,6 +66,9 @@
         </button>
         <button class="act-btn" data-view="apis" title="Справочник RoyLang API">
           <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+        </button>
+        <button class="act-btn" data-view="nexus" title="Пакеты Nexus (@author/pkg · .roypkg)">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 2 20 6.5v11L12 22 4 17.5v-11L12 2z"/><path d="M12 22V12"/><path d="M20 6.5 12 12 4 6.5"/></svg>
         </button>
       </nav>
 
@@ -139,12 +143,32 @@
         <div class="side-view hidden" id="view-apis">
           <div class="side-head">
             <span>API СПРАВОЧНИК</span>
-            <span class="badge-num" id="apiTotalCount">504</span>
+            <span class="badge-num" id="apiTotalCount">821</span>
           </div>
           <div class="side-input-wrap">
             <input id="searchApiInput" type="search" placeholder="Фильтр API (drawCircle, mesh3D...)" />
           </div>
           <div id="apiList" class="api-list"></div>
+        </div>
+
+        <!-- Nexus Package Manager View -->
+        <div class="side-view hidden" id="view-nexus">
+          <div class="side-head">
+            <span>NEXUS ПАКЕТЫ</span>
+            <div class="side-head-btns">
+              <button id="btnNexusRefresh" title="Обновить реестр Nexus">↻</button>
+              <button id="btnNexusNewPkg" title="Создать .roypkg шаблон">+pkg</button>
+            </div>
+          </div>
+          <div class="side-input-wrap">
+            <input id="searchNexusInput" type="search" placeholder="Поиск пакетов (@author/pkg)..." />
+          </div>
+          <div class="nexus-actions-bar">
+            <button id="btnNexusPack" title="Упаковать текущий пакет в .roypkg">📦 Pack .roypkg</button>
+            <button id="btnNexusUnpack" title="Распаковать .roypkg в проект">📂 Unpack</button>
+          </div>
+          <div id="nexusStatus" class="muted" style="font-size:11px;padding:4px 8px;display:none"></div>
+          <div id="nexusList" class="nexus-list"><div class="muted pad-msg">Нажмите ↻ для загрузки реестра RoyLang Nexus...</div></div>
         </div>
       </aside>
 
@@ -161,6 +185,9 @@
           </div>
           <div class="bc-actions">
             <label class="chk-mini" title="Мягкая подмена кода и данных без перезапуска сцены"><input id="chkHotSwap" type="checkbox" checked /> Hot-Swap</label>
+            <button id="btnUiDesigner" class="bc-btn" title="Визуальный конструктор .royui">🧩 UI</button>
+            <button id="btnCutsceneTool" class="bc-btn" title="Таймлайн катсцен и граф диалогов">🎬 Катсцена</button>
+            <button id="btnPixelTool" class="bc-btn" title="Встроенный пиксель-арт редактор">🎨 Пиксель</button>
             <button id="btnToggleSplit" class="bc-btn" title="Разделить редактор (Ctrl+\)">◫ Split</button>
             <button id="btnWelcomeTab" class="bc-btn" title="Стартовый экран и шаблоны">🏠 Старт</button>
           </div>
@@ -180,6 +207,43 @@
           <div class="iv-toolbar"><div class="iv-meta" id="ivMeta"></div><div class="iv-controls" id="ivControls"></div></div>
           <div class="iv-stage" id="ivStage"><img id="ivImg" alt="Preview" /></div>
         </div>
+        <div id="diffViewer" class="diff-viewer hidden">
+          <div class="diff-head">
+            <span id="diffTitle">Git Diff (HEAD ↔ Рабочая копия)</span>
+            <div class="side-head-btns">
+              <button id="btnDiffOpenEdit">📝 Открыть файл</button>
+              <button id="btnDiffClose">✕ Закрыть</button>
+            </div>
+          </div>
+          <div id="diffHost" class="diff-host"></div>
+        </div>
+        <div id="pixelViewer" class="diff-viewer hidden">
+          <div class="diff-head">
+            <span>🎨 Пиксель-арт редактор</span>
+            <div class="side-head-btns">
+              <button id="btnPixelClose">✕ Закрыть</button>
+            </div>
+          </div>
+          <div id="pixelHost" class="pixel-host"></div>
+        </div>
+        <div id="uiDesignerViewer" class="diff-viewer hidden">
+          <div class="diff-head">
+            <span>🧩 Визуальный конструктор .royui</span>
+            <div class="side-head-btns">
+              <button id="btnUiDesignerClose">✕ Закрыть</button>
+            </div>
+          </div>
+          <div id="uiDesignerHost" class="pixel-host"></div>
+        </div>
+        <div id="cutsceneViewer" class="diff-viewer hidden">
+          <div class="diff-head">
+            <span>🎬 Таймлайн катсцен и граф диалогов</span>
+            <div class="side-head-btns">
+              <button id="btnCutsceneClose">✕ Закрыть</button>
+            </div>
+          </div>
+          <div id="cutsceneHost" class="pixel-host"></div>
+        </div>
 
         <div class="resizer-h" id="resizerBottom" title="Изменить высоту панели"></div>
 
@@ -188,6 +252,8 @@
             <button class="btab active" data-tab="problems">ПРОБЛЕМЫ <span id="probCount" class="count">0</span></button>
             <button class="btab" data-tab="console">КОНСОЛЬ ИГРЫ <span id="logCount" class="count">0</span></button>
             <button class="btab" data-tab="debug">ОТЛАДКА / TWEAK <span id="dbgBadge" class="count">0</span></button>
+            <button class="btab" data-tab="profiler">ПРОФАЙЛЕР</button>
+            <button class="btab" data-tab="terminal">ТЕРМИНАЛ</button>
             <button id="btnClearLog" class="clear-btn">Очистить</button>
           </div>
           <div id="problemsPane" class="bottom-body"></div>
@@ -200,6 +266,11 @@
           </div>
           <div id="debugPane" class="bottom-body debug-pane hidden">
             <div class="dbg-toolbar">
+              <button id="dbgStepContinue" class="bc-btn" title="Продолжить выполнение (Resume)">▶ Продолжить</button>
+              <button id="dbgStepOver" class="bc-btn" title="Шаг через строку (Step Over)">⤵ Шаг</button>
+              <button id="dbgStepInto" class="bc-btn" title="Шаг внутрь (Step Into)">↴ Внутрь</button>
+              <button id="dbgClearBps" class="bc-btn" title="Очистить все брейкпоинты">✕ Брейкпоинты</button>
+              <span class="dbg-sep"></span>
               <span class="dbg-lbl">Слои:</span>
               <label class="chk-mini"><input type="checkbox" data-dl="hitboxes" /> Хитбоксы</label>
               <label class="chk-mini"><input type="checkbox" data-dl="grid" /> Сетка</label>
@@ -223,6 +294,31 @@
                 <div class="dbg-col-title">ИНСПЕКТОР СУЩНОСТЕЙ</div>
                 <div id="entityInspector" class="dbg-list"><div class="muted">Включите 🎯 в превью и кликните по объекту</div></div>
               </div>
+              <div class="dbg-col">
+                <div class="dbg-col-title">БРЕЙКПОИНТЫ И СТЕК</div>
+                <div id="debuggerStateBox" class="dbg-list"><div class="muted">Кликните по левому полю редактора для точки останова</div></div>
+              </div>
+            </div>
+          </div>
+          <div id="profilerPane" class="bottom-body profiler-pane hidden">
+            <div class="prof-stats-row" id="profStatsRow">
+              <span>FPS: <strong id="profFpsVal">--</strong></span>
+              <span>Кадр: <strong id="profTotalVal">-- ms</strong></span>
+              <span>Сущности: <strong id="profEntVal">0</strong></span>
+              <span>Частицы: <strong id="profPartVal">0</strong></span>
+              <span>Память: <strong id="profHeapVal">--</strong></span>
+              <span>Нагрузка цикла: <strong id="profLoopVal">0%</strong></span>
+            </div>
+            <div class="prof-canvas-wrap">
+              <canvas id="profCanvas" width="600" height="72"></canvas>
+              <div id="profPhasesBar" class="prof-phases-bar"></div>
+            </div>
+          </div>
+          <div id="terminalPane" class="bottom-body console-wrap hidden">
+            <div id="terminalLogs" class="console-logs term-logs"></div>
+            <div class="repl-bar">
+              <span class="repl-prompt">$</span>
+              <input id="termInput" type="text" placeholder="Команда в папке проекта (node server.mjs, git status, love ., dir)..." autocomplete="off" />
             </div>
           </div>
         </div>
@@ -259,10 +355,12 @@
             <button id="btnQuickSave" title="Быстрое сохранение состояния (saveState)">💾</button>
             <button id="btnQuickLoad" title="Быстрая загрузка состояния (loadState)">📂</button>
             <button id="btnScreenshot" title="Скриншот кадра">📷</button>
+            <button id="btnPreview2P" title="Открыть 2-е окно превью (мультиплеер / P2P)">👥</button>
           </div>
         </div>
         <div id="previewViewport" class="preview-viewport preset-auto">
           <iframe id="previewFrame" sandbox="allow-scripts allow-same-origin allow-pointer-lock" allowfullscreen></iframe>
+          <iframe id="previewFrame2" class="hidden" sandbox="allow-scripts allow-same-origin allow-pointer-lock" allowfullscreen></iframe>
         </div>
       </section>
     </div>
@@ -281,7 +379,7 @@
         <span class="sb-item" id="sbCursor">Стр 1, Стб 1</span>
         <span class="sb-item">Отступ: 2</span>
         <span class="sb-item">UTF-8</span>
-        <span class="sb-item sb-lang">RoyLang v6.9</span>
+        <span class="sb-item sb-lang">RoyLang v7.0</span>
         <button class="sb-item sb-update" id="sbUpdateBtn" title="Центр обновлений: IDE и движок RoyLang">⟳ Обновления</button>
       </div>
     </footer>
@@ -323,7 +421,7 @@
           <div class="upd-card-head">
             <div>
               <strong>Уровень 2 · Движок RoyLang</strong>
-              <span class="upd-cur" id="updEngActive">v6.5 (встроенный)</span>
+              <span class="upd-cur" id="updEngActive">v7.0 (встроенный)</span>
             </div>
             <button id="btnEngResetBuiltin" title="Вернуться к встроенному в IDE движку">↺ Встроенная</button>
           </div>
@@ -359,6 +457,13 @@
           <button class="bld-tab" data-target="zip">🗜 ZIP (Игра)</button>
           <button class="bld-tab" data-target="zip-src">📁 ZIP (Исходники)</button>
           <button class="bld-tab" data-target="exe">🪟 EXE (Windows)</button>
+          <button class="bld-tab" data-target="android">📱 Android (.apk)</button>
+          <button class="bld-tab" data-target="luau">🟦 Luau (Roblox)</button>
+          <button class="bld-tab" data-target="lua">🌙 Lua / LÖVE2D</button>
+          <button class="bld-tab" data-target="csharp">🟪 Unity C#</button>
+          <button class="bld-tab" data-target="gdscript">🤖 Godot 4</button>
+          <button class="bld-tab" data-target="server">🖥 Server (Node)</button>
+          <button class="bld-tab" data-target="wasm">⚡ WASM (.wasm)</button>
         </div>
         <div class="build-grid">
           <label>Название<input id="bldName" type="text" placeholder="My Game" /></label>
@@ -373,6 +478,11 @@
         <div class="build-icon-row">
           <label>Иконка .ico (для .exe)<div class="build-row"><input id="bldIcon" type="text" placeholder="assets/icon.ico (необязательно)" /><button id="btnPickBuildIcon" title="Выбрать .ico файл">🖼</button></div></label>
         </div>
+        <div class="build-grid build-android-row hidden" id="buildAndroidRow">
+          <label>Package ID<input id="bldPkgId" type="text" placeholder="com.roywals.mygame" /></label>
+          <label>Код сборки (versionCode)<input id="bldVersionCode" type="number" min="1" value="1" /></label>
+          <label>Ориентация<select id="bldOrientation"><option value="auto">Авто</option><option value="portrait">Портрет</option><option value="landscape">Альбом</option></select></label>
+        </div>
         <div class="build-checks">
           <label class="chk"><input id="bldRelease" type="checkbox" checked /> Release (#if RELEASE + minify)</label>
           <label class="chk"><input id="bldTreeShake" type="checkbox" checked /> Smart Tree-Shaking</label>
@@ -382,13 +492,57 @@
           <label class="chk"><input id="bldResizable" type="checkbox" checked /> Resizable окно</label>
           <label class="chk"><input id="bldSaveManifest" type="checkbox" checked /> Сохранить в game.royproj</label>
         </div>
+        <div id="buildAnalysisBox" class="build-analysis"></div>
         <div class="build-log" id="buildLog">Готово к сборке. Выберите цель и нажмите «Собрать».</div>
+        <div id="buildAndroidActions" class="build-footer-btns hidden" style="margin-top:6px;">
+          <button id="btnAndroidOpenProj">📂 Открыть папку проекта (GitHub Actions)</button>
+          <button id="btnAndroidBuildPwa" class="primary">📱 Собрать PWA-версию</button>
+          <button id="btnAndroidOpenApk" class="primary hidden">📦 Открыть папку с APK</button>
+        </div>
       </div>
       <div class="build-footer">
         <span class="muted" id="buildResultInfo">—</span>
         <div class="build-footer-btns">
           <button id="btnOpenBuildDir" disabled>📂 Открыть папку с билдом</button>
           <button id="btnStartBuild" class="primary">🔨 Собрать</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Settings Modal -->
+  <div id="settingsModal" class="cmd-modal hidden">
+    <div class="info-box" style="max-width:480px;">
+      <div class="info-head">
+        <span>⚙ Настройки RoyStudio IDE</span>
+        <button id="btnCloseSettings" class="info-close">✕</button>
+      </div>
+      <div class="info-body settings-body">
+        <label class="set-row">
+          <span>Тема интерфейса и редактора</span>
+          <select id="setTheme">
+            <option value="vs-dark">VS Code Dark (Стандартная)</option>
+            <option value="midnight">Midnight Blue</option>
+            <option value="monokai">Monokai Dark</option>
+            <option value="hc-light">Light (Светлая)</option>
+          </select>
+        </label>
+        <label class="set-row">
+          <span>Размер шрифта редактора (px)</span>
+          <input id="setFontSize" type="number" min="10" max="26" value="13" />
+        </label>
+        <label class="set-row chk">
+          <input id="setFormatOnSave" type="checkbox" />
+          <span>Format on Save (автоформат при Ctrl+S)</span>
+        </label>
+        <label class="set-row">
+          <span>Версия движка RoyLang по умолчанию</span>
+          <select id="setDefaultEngine">
+            <option value="__builtin__">Встроенная (v7.0 «Nexus»)</option>
+          </select>
+        </label>
+        <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:8px;">
+          <button id="btnSaveSettings" class="primary">✓ Сохранить настройки</button>
         </div>
       </div>
     </div>
